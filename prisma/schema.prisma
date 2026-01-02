@@ -1,0 +1,172 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Администраторы системы
+model Admin {
+  id       String @id           // Уникальный ID администратора
+  username String @unique      // Логин администратора
+  
+  // controlEvents Event[]        // События контроля которые проводит
+}
+
+// Учителя школы
+model Teacher {
+  id        String    @id                     // Уникальный ID учителя
+  username  String    @unique                 // Логин учителя
+  name      String                            // Имя
+  surname   String                            // Фамилия
+  email     String?   @unique                 // Email (необязательный)
+  createdAt DateTime  @default(now())         // Дата создания записи
+  
+  // Связи с другими таблицами
+  subjects  Subject[]                         // Предметы, которые ведет учитель
+  lessons   Lesson[]                          // Уроки учителя
+  classes   Class[]                           // Классы, которыми руководит
+  events    Event[]                           // События контроля учителя (которого контролируют)
+}
+
+// Классы (например 9А, 10Б)
+model Class {
+  id           Int    @id @default(autoincrement())  // Уникальный ID класса
+  name         String @unique                        // Название класса (9А, 10Б и т.д.)
+  gradeLevel   Int                                   // Номер параллели (9, 10, 11 и т.д.)
+  capacity     Int                                   // Максимальное количество учеников
+  supervisorId String?                               // ID классного руководителя
+  supervisor   Teacher?       @relation(fields: [supervisorId], references: [id])    // Классный руководитель
+  lessons      Lesson[]                              // Уроки класса
+  // events       Event[]                               // События контроля класса
+  announcements Announcement[]                       // Объявления для класса
+}
+
+// Учебные предметы
+model Subject {
+  id       Int       @id @default(autoincrement())  // Уникальный ID предмета
+  name     String    @unique                        // Название предмета (математика, история и т.д.)
+  teachers Teacher[]                                // Учителя, ведущие предмет
+  lessons  Lesson[]                                 // Уроки по предмету
+}
+
+// Уроки в расписании
+model Lesson {
+  id        Int      @id @default(autoincrement())  // Уникальный ID урока
+  name      String                                  // Название урока
+  day       Day                                     // День недели
+  startTime DateTime                                // Время начала
+  endTime   DateTime                                // Время окончания
+  subjectId   Int                                   // ID предмета
+  subject     Subject      @relation(fields: [subjectId], references: [id])     // Предмет урока
+  classId     Int                                   // ID класса
+  class       Class        @relation(fields: [classId], references: [id])       // Класс, у которого урок
+  teacherId   String                                // ID учителя
+  teacher     Teacher      @relation(fields: [teacherId], references: [id])     // Учитель урока
+  events      Event[]                               // События контроля этого урока
+}
+
+// Школьные события / Контроль уроков (ПЛАНИРОВАНИЕ контроля)
+model Event {
+  id          Int      @id @default(autoincrement()) // Уникальный ID события
+  title       String                                 // Название события
+  description String                                 // Описание события
+  startTime   DateTime                               // Время начала контроля
+  endTime     DateTime                               // Время окончания контроля
+  controllerType ControllerType                      // ТИП контролера (директор, завуч и т.д.)
+  // controllerId   String                              // ID конкретного человека кто контролирует
+  // controller     Admin  @relation(fields: [controllerId], references: [id]) // Кто контролирует
+  teacherId   String                                 // ID учителя КОТОРОГО контролируют
+  teacher     Teacher  @relation(fields: [teacherId], references: [id]) // Учитель урока
+  lessonId    Int?                                   // ID урока (НЕОБЯЗАТЕЛЬНО)
+  lesson      Lesson?  @relation(fields: [lessonId], references: [id])  // Урок который контролируют
+  // classId     Int?                                   // ID класса (НЕОБЯЗАТЕЛЬНО)
+  // class       Class?   @relation(fields: [classId], references: [id])   // Класс события
+  feedback    Feedback?                              // Детальная обратная связь после контроля
+}
+
+// Лист наблюдения еженедельного планирования урока (ПОСЛЕ контроля)
+model Feedback {
+  id              Int      @id @default(autoincrement()) // Уникальный ID
+  createdAt       DateTime @default(now())               // Время создания
+  
+  // ОСНОВНАЯ ИНФОРМАЦИЯ
+  observerName           String                          // ФИО наблюдателя
+  observationDate        DateTime                        // Дата наблюдения
+  observationTime        String                          // Время наблюдения
+  subject                String                          // Предмет
+  grade                  String                          // Параллель
+  presentTeachersCount   Int                             // Количество присутствующих учителей
+  
+  // ТАБЛИЦА 1: Вопросы для наблюдения (да/нет)
+  hasTeamLeader          Boolean                         // Имеется ли в группе тим-лидер?
+  hasAgenda              Boolean                         // Определена ли повестка заседания?
+  isProcessDocumented    Boolean                         // Фиксируется ли процесс планирования?
+  teachersShowInterest   Boolean                         // Проявляют ли учителя интерес при планировании?
+  teachersGiveSuggestions Boolean                        // Активно ли вносят предложения?
+  effectiveCollaboration Boolean                         // Эффективно ли сотрудничают?
+  analyzePreviousLessons Boolean                         // Проводится ли анализ предыдущих уроков?
+  
+  // ТАБЛИЦА 2: Исходные данные при планировании (да/нет)
+  useLessonReflection    Boolean                         // Рефлексия урока
+  useStudentAchievements Boolean                         // Учебные достижения учащихся
+  useExternalAssessment  Boolean                         // Аналитический отчет от ЦПИ
+  usePedagogicalDecisions Boolean                        // Рекомендации педсовета
+  useLessonVisitResults  Boolean                         // Результаты посещения уроков
+  useStudentFeedback     Boolean                         // Обратная связь от учащихся
+  useOtherData           Boolean                         // Прочее
+  otherDataDescription   String?                         // Описание прочих данных
+  
+  // ТАБЛИЦА 3: В процессе планирования учителя параллели (да/нет)
+  discussGoalsAlignment     Boolean                      // Обсуждают соответствие цели стандартам
+  adaptLearningGoals        Boolean                      // Адаптируют цели к уроку (40 мин)
+  selectAppropriateResources Boolean                     // Выбирают подходящие ресурсы
+  selectDifferentiatedStrategies Boolean                 // Подбирают стратегии для разных потребностей
+  selectEngagingTasks       Boolean                      // Подбирают интересные задания
+  discussDescriptors        Boolean                      // Обсуждают дескрипторы
+  allocateTime              Boolean                      // Распределяют время
+  selectFormativeAssessment Boolean                      // Выбирают формы оценивания
+  planReflection            Boolean                      // Планируют рефлексию
+  useICTTools               Boolean                      // Предусматривают ИКТ
+  defineHomework            Boolean                      // Определяют домашнее задание
+  considerSafety            Boolean                      // Предусматривают безопасность
+  
+  // ТАБЛИЦА 4: Текстовые поля
+  comments               String?                         // Комментарии
+  recommendations        String?                         // Рекомендации
+  
+  // Связи с другими таблицами
+  eventId                Int      @unique                // ID события (связь 1:1)
+  event                  Event    @relation(fields: [eventId], references: [id]) // Событие контроля
+}
+
+// Объявления
+model Announcement {
+  id          Int      @id @default(autoincrement()) // Уникальный ID объявления
+  title       String                                 // Заголовок объявления
+  description String                                 // Текст объявления
+  date        DateTime                               // Дата публикации
+  classId Int?                                       // ID класса (необязательно, может быть общешкольное)
+  class   Class? @relation(fields: [classId], references: [id])              // Класс, для которого объявление
+}
+
+// Перечисление: дни недели
+enum Day {
+  MONDAY      // Понедельник
+  TUESDAY     // Вторник
+  WEDNESDAY   // Среда
+  THURSDAY    // Четверг
+  FRIDAY      // Пятница
+}
+
+// Перечисление: кто контролирует урок
+enum ControllerType {
+  DIRECTOR     // Директор
+  DEPUTY       // Завуч/Заместитель директора
+  METHODIST    // Методист
+  INSPECTOR    // Инспектор
+  ADMIN        // Администратор
+  TEACHER      // Учитель (взаимопосещение)
+}
