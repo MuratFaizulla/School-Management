@@ -196,7 +196,7 @@ const LessonForm = ({
           <h2 className="font-medium text-blue-800 mb-3">Время урока</h2>
           
           {/* Переключатель режимов */}
-          <div className="flex gap-4 mb-4">
+          <div className="flex justify-center gap-4 mb-4">
             <button
               type="button"
               onClick={() => {
@@ -254,7 +254,7 @@ const LessonForm = ({
               </div>
 
               {/* Поля времени - видимые только при ручном режиме */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="flex justify-around mb-2">
                 <InputField
                   label="Время начала"
                   name="startTime"
@@ -296,7 +296,7 @@ const LessonForm = ({
             </div>
           ) : (
             /* Ручной ввод времени */
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex justify-around mb-2">
               <InputField
                 label="Время начала"
                 name="startTime"
