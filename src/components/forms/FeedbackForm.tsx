@@ -21,9 +21,14 @@ const FeedbackForm = ({
   setOpen: Dispatch<SetStateAction<boolean>>;
   relatedData?: any;
 }) => {
+  // ✅ Перемещаем деструктуризацию в начало
+  const { events } = relatedData || { events: [] };
+
   const {
     register,
     handleSubmit,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<FeedbackSchema>({
     resolver: zodResolver(feedbackSchema),
@@ -37,6 +42,46 @@ const FeedbackForm = ({
       message: "",
     }
   );
+
+  // ✅ Отслеживаем выбранное событие
+  const selectedEventId = watch('eventId');
+
+  // ✅ Автоматическое заполнение данных из события
+  useEffect(() => {
+    if (selectedEventId && events?.length > 0) {
+      const selectedEvent = events.find((event: any) => event.id == selectedEventId);
+      
+      if (selectedEvent) {
+        const eventDate = new Date(selectedEvent.startTime);
+        
+        // Заполняем дату наблюдения
+        (setValue as any)('observationDate', eventDate.toISOString().split('T')[0]);
+        
+        // Заполняем время наблюдения
+        const timeString = eventDate.toLocaleTimeString('ru-RU', { 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        });
+        (setValue as any)('observationTime', timeString);
+        
+        // ✅ Если есть связанный урок - берем предмет и класс
+        if (selectedEvent.lesson) {
+          if (selectedEvent.lesson.subject?.name) {
+            (setValue as any)('subject', selectedEvent.lesson.subject.name);
+          }
+          
+          if (selectedEvent.lesson.class?.name) {
+            (setValue as any)('grade', selectedEvent.lesson.class.name);
+          }
+          
+          toast.success(`Данные заполнены из урока: ${selectedEvent.lesson.subject?.name} - ${selectedEvent.lesson.class?.name}`);
+        } else {
+          // ✅ Если урока нет - просто уведомляем о заполнении времени
+          toast.success(`Время заполнено из события: ${selectedEvent.title}`);
+        }
+      }
+    }
+  }, [selectedEventId, events, setValue]);
 
   const onSubmit = handleSubmit((data) => {
     console.log(data);
@@ -52,8 +97,6 @@ const FeedbackForm = ({
       router.refresh();
     }
   }, [state, router, type, setOpen]);
-
-  const { events } = relatedData;
 
   return (
     <form className="flex flex-col gap-6 max-h-[80vh] overflow-y-auto" onSubmit={onSubmit}>
@@ -73,10 +116,96 @@ const FeedbackForm = ({
         </div>
       )}
 
-      {/* ОСНОВНАЯ ИНФОРМАЦИЯ */}
+      {/* ✅ Выбор события - только для создания */}
+   {type === "create" && (
+  <div className="bg-purple-50 border border-purple-200 p-4 rounded-lg">
+    <h3 className="font-medium text-purple-800 mb-3">Событие для наблюдения</h3>
+    <div className="flex flex-col gap-2">
+      <label className="text-xs text-gray-500">
+        Выберите событие контроля (остальные поля заполнятся автоматически)
+      </label>
+      <select
+        className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full"
+        {...register("eventId")}
+        defaultValue={data?.eventId || ""}
+      >
+        <option value="">Выберите событие</option>
+        {events?.map((event: any) => {
+          // ✅ Мапинг enum Day на русские названия
+          const dayMapping = {
+            'MONDAY': 'понедельник',
+            'TUESDAY': 'вторник', 
+            'WEDNESDAY': 'среда',
+            'THURSDAY': 'четверг',
+            'FRIDAY': 'пятница'
+          };
+
+          // ✅ Строим текст опции
+          let optionText = `${event.title} - ${event.teacher.name} ${event.teacher.surname}`;
+          
+          // ✅ Если есть урок - берем данные из урока
+          if (event.lesson) {
+            const className = event.lesson.class?.name || '';
+            const subjectName = event.lesson.subject?.name || '';
+            
+            // ✅ Время урока из lesson
+            const lessonStartTime = new Date(event.lesson.startTime).toLocaleTimeString('ru-RU', { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            });
+            const lessonEndTime = new Date(event.lesson.endTime).toLocaleTimeString('ru-RU', { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            });
+            
+            // ✅ День недели из enum Day
+            const dayOfWeek = dayMapping[event.lesson.day as keyof typeof dayMapping] || event.lesson.day;
+            
+            optionText += ` ${className} ${subjectName} (${dayOfWeek}, ${lessonStartTime}-${lessonEndTime})`;
+          } else {
+            // ✅ Если урока нет - используем время события
+            const eventStartTime = new Date(event.startTime).toLocaleTimeString('ru-RU', { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            });
+            const eventEndTime = new Date(event.endTime).toLocaleTimeString('ru-RU', { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            });
+            const dayNames = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
+            const eventDay = dayNames[new Date(event.startTime).getDay()];
+            
+            optionText += ` (${eventDay}, ${eventStartTime}-${eventEndTime})`;
+          }
+          
+          return (
+            <option value={event.id} key={event.id}>
+              {optionText}
+            </option>
+          );
+        })}
+      </select>
+      {errors.eventId?.message && (
+        <p className="text-xs text-red-400">
+          {errors.eventId.message.toString()}
+        </p>
+      )}
+      
+      {selectedEventId && (
+        <div className="bg-white p-3 rounded-md border border-purple-200 mt-2">
+          <p className="text-sm text-purple-700">
+            ✅ Событие выбрано - данные заполнятся автоматически
+          </p>
+        </div>
+      )}
+    </div>
+  </div>
+)}
+
+      {/* ✅ ОСНОВНАЯ ИНФОРМАЦИЯ - исправлен CSS grid */}
       <div className="bg-gray-50 p-4 rounded-lg">
         <h2 className="text-lg font-medium mb-4 text-blue-800">Основная информация</h2>
-        <div className="grid-cols-1 md:grid-cols-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
             <InputField
               label="ФИО наблюдателя"
@@ -131,37 +260,8 @@ const FeedbackForm = ({
             />
           </div>
 
-          {/* Событие - только для создания */}
-          {type === "create" ? (
-            <div className="flex flex-col gap-2 md:col-span-3 lg:col-span-4">
-              <label className="text-xs text-gray-500">Событие контроля</label>
-              <select
-                className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full"
-                {...register("eventId")}
-                defaultValue={data?.eventId || ""}
-              >
-                <option value="">Выберите событие</option>
-                {events?.map((event: any) => (
-                  <option value={event.id} key={event.id}>
-                    {event.title} - {event.teacher.name} {event.teacher.surname} ({
-                      new Date(event.startTime).toLocaleString('ru-RU', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })
-                    })
-                  </option>
-                ))}
-              </select>
-              {errors.eventId?.message && (
-                <p className="text-xs text-red-400">
-                  {errors.eventId.message.toString()}
-                </p>
-              )}
-            </div>
-          ) : (
-            /* Для обновления - скрытое поле eventId */
+          {/* ✅ Для обновления - скрытые поля */}
+          {type === "update" && (
             <InputField
               label="Event ID"
               name="eventId"
@@ -291,6 +391,7 @@ const FeedbackForm = ({
               defaultValue={data?.comments || ""}
               rows={6}
               className="ring-[1.5px] ring-gray-300 p-3 rounded-md text-sm resize-none w-full"
+              placeholder="Ваши комментарии по наблюдению..."
             />
           </div>
           
@@ -301,6 +402,7 @@ const FeedbackForm = ({
               defaultValue={data?.recommendations || ""}
               rows={6}
               className="ring-[1.5px] ring-gray-300 p-3 rounded-md text-sm resize-none w-full"
+              placeholder="Рекомендации для улучшения..."
             />
           </div>
         </div>

@@ -5,19 +5,28 @@ type RouteAccessMap = {
 };
 
 export const routeAccessMap: RouteAccessMap = {
+  // ✅ Основные роутеры по ролям
   "/admin(.*)": ["admin"],
-  "/student(.*)": ["student"],
   "/teacher(.*)": ["teacher"],
-  "/parent(.*)": ["parent"],
-  "/list/teachers": ["admin", "teacher"],
-  "/list/students": ["admin", "teacher"],
-  "/list/parents": ["admin", "teacher"],
+  
+  // ✅ Управление пользователями
+  "/list/teachers": ["admin"],
+  
+  // ✅ Академическая структура
   "/list/subjects": ["admin"],
-  "/list/classes": ["admin", "teacher"],
-  "/list/exams": ["admin", "teacher", "student", "parent"],
-  "/list/assignments": ["admin", "teacher", "student", "parent"],
-  "/list/results": ["admin", "teacher", "student", "parent"],
-  "/list/attendance": ["admin", "teacher", "student", "parent"],
-  "/list/events": ["admin", "teacher", "student", "parent"],
-  "/list/announcements": ["admin", "teacher", "student", "parent"],
+  "/list/classes": ["admin"],
+  "/list/lessons": ["admin", "teacher"],
+  
+  // ✅ Система наблюдений (новое)
+  "/list/events": ["admin", "teacher"],
+  "/list/events/(.*)": ["admin", "teacher"], // Отдельные страницы событий
+  "/list/feedback": ["admin", "teacher"],
+  "/list/feedback/(.*)": ["admin", "teacher"], // Отдельные страницы feedback
+  
+  // ✅ Календарь и расписание
+  "/calendar": ["admin", "teacher"],
+  
+  // ✅ Аналитика и отчеты
+  "/analytics": ["admin"],
+  "/reports": ["admin", "teacher"],
 };

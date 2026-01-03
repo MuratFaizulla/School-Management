@@ -85,24 +85,56 @@ const FormContainer = async ({ table, type, data, id }: FormContainerProps) => {
         };
         break;
 
-      case "feedback":
-        const feedbackEvents = await prisma.event.findMany({
-          where: {
-            feedback: null, // Только события без обратной связи
+      // case "feedback":
+      //   const feedbackEvents = await prisma.event.findMany({
+      //     where: {
+      //       feedback: null, // Только события без обратной связи
+      //     },
+      //     select: {
+      //       id: true,
+      //       title: true,
+      //       startTime: true,
+      //       teacher: {
+      //         select: { name: true, surname: true },
+      //       },
+      //     },
+      //   });
+      //   relatedData = {
+      //     events: feedbackEvents,
+      //   };
+      //   break;
+
+case "feedback":
+  const feedbackEvents = await prisma.event.findMany({
+    where: {
+      feedback: null, // Только события без обратной связи
+    },
+    include: {
+      teacher: {
+        select: { id: true, name: true, surname: true },
+      },
+      lesson: {
+        select: {
+          id: true,
+          name: true,
+          day: true,        // ✅ День недели (enum)
+          startTime: true,  // ✅ Время урока
+          endTime: true,    // ✅ Время урока
+          subject: {
+            select: { name: true }
           },
-          select: {
-            id: true,
-            title: true,
-            startTime: true,
-            teacher: {
-              select: { name: true, surname: true },
-            },
-          },
-        });
-        relatedData = {
-          events: feedbackEvents,
-        };
-        break;
+          class: {
+            select: { name: true }
+          }
+        }
+      }
+    },
+    orderBy: { startTime: 'desc' }
+  });
+  relatedData = {
+    events: feedbackEvents,
+  };
+  break;
 
       default:
         break;
