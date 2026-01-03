@@ -7,10 +7,8 @@ import { ITEM_PER_PAGE } from "@/lib/settings";
 import { Event, Prisma, Teacher } from "@prisma/client";
 import Image from "next/image";
 import { auth } from "@clerk/nextjs/server";
-import EventCalendarContainer from "@/components/EventCalendarContainer";
 import Link from "next/link";
 
-// ✅ Добавляем feedback в тип
 type EventListType = Event & { 
   teacher: Teacher;
   feedback?: { id: number } | null;
@@ -35,7 +33,6 @@ const EventListPage = async ({
     ...(role === "admin" ? [{ header: "Действия", accessor: "action" }] : []),
   ];
 
-  // Функция для перевода типа контролера
   const translateControllerType = (type: string) => {
     const translations: { [key: string]: string } = {
       DIRECTOR: "Директор",
@@ -48,6 +45,89 @@ const EventListPage = async ({
     return translations[type] || type;
   };
 
+  // ✅ Мобильная карточка события
+  const MobileEventCard = ({ item }: { item: EventListType }) => (
+    <div className="bg-white border border-gray-200 rounded-lg p-4 mb-3 shadow-sm">
+      {/* Заголовок */}
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex-1 min-w-0">
+          <h3 className="font-medium text-gray-900 truncate">{item.title}</h3>
+          <p className="text-sm text-gray-500 mt-1 line-clamp-2">{item.description}</p>
+        </div>
+        <div className="ml-2 flex gap-1">
+          <Link href={`/list/events/${item.id}`}>
+            <button className="w-8 h-8 flex items-center justify-center rounded-full bg-blue-100 hover:bg-blue-200">
+              <Image src="/view.png" alt="Посмотреть" width={14} height={14} />
+            </button>
+          </Link>
+          {role === "admin" && (
+            <FormContainer table="event" type="update" data={item} />
+          )}
+        </div>
+      </div>
+
+      {/* Основная информация */}
+      <div className="space-y-2">
+        {/* Учитель */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600 min-w-fit">Учитель:</span>
+          <span className="text-sm font-medium">
+            {item.teacher ? `${item.teacher.name} ${item.teacher.surname}` : "-"}
+          </span>
+        </div>
+
+        {/* Дата и время */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600 min-w-fit">Время:</span>
+          <span className="text-sm">
+            {item.startTime.toLocaleDateString("ru-RU")} в{" "}
+            {item.startTime.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
+          </span>
+        </div>
+
+        {/* Тип контроля и статус */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600">Контроль:</span>
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+              {translateControllerType(item.controllerType)}
+            </span>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            {item.feedback ? (
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
+                📋 Есть лист
+              </span>
+            ) : (
+              <div className="flex items-center gap-1">
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">
+                  ⏳ Нет листа
+                </span>
+                {role === "admin" && (
+                  <FormContainer 
+                    table="feedback" 
+                    type="create" 
+                    data={{ eventId: item.id }}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Действия админа */}
+      {role === "admin" && (
+        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
+          <FormContainer table="event" type="delete" id={item.id} />
+          <span className="text-xs text-gray-400 ml-auto">ID: {item.id}</span>
+        </div>
+      )}
+    </div>
+  );
+
+  // Десктопная таблица
   const renderRow = (item: EventListType) => (
     <tr
       key={item.id}
@@ -122,7 +202,6 @@ const EventListPage = async ({
       
       <td>
         <div className="flex items-center gap-2">
-          {/* Кнопка просмотра */}
           <Link href={`/list/events/${item.id}`}>
             <button 
               className="w-7 h-7 flex items-center justify-center rounded-full bg-lamaSky hover:bg-blue-400 transition-colors"
@@ -132,13 +211,11 @@ const EventListPage = async ({
             </button>
           </Link>
           
-          {/* Кнопки админа */}
           {role === "admin" && (
             <>
               <FormContainer table="event" type="update" data={item} />
               <FormContainer table="event" type="delete" id={item.id} />
               
-              {/* Быстрая кнопка создания feedback */}
               {!item.feedback && (
                 <FormContainer 
                   table="feedback" 
@@ -153,10 +230,10 @@ const EventListPage = async ({
     </tr>
   );
 
+  // Запрос данных (тот же код)...
   const { page, ...queryParams } = searchParams;
   const p = page ? parseInt(page) : 1;
 
-  // Расширенный поиск
   const query: Prisma.EventWhereInput = {};
 
   if (queryParams) {
@@ -189,7 +266,6 @@ const EventListPage = async ({
     }
   }
 
-  // Ролевая фильтрация
   if (role === "teacher") {
     query.OR = [
       { teacherId: currentUserId! },
@@ -206,23 +282,23 @@ const EventListPage = async ({
       where: query,
       include: { 
         teacher: true,
-        feedback: { select: { id: true } }, // ✅ Включаем feedback для статуса
+        feedback: { select: { id: true } },
       },
       take: ITEM_PER_PAGE,
       skip: ITEM_PER_PAGE * (p - 1),
-      orderBy: { startTime: "desc" }, // ✅ Сначала новые события
+      orderBy: { startTime: "desc" },
     }),
     prisma.event.count({ where: query }),
   ]);
 
   return (
-    <div className="bg-white p-4 rounded-md flex-1 m-4 mt-0">
-      {/* TOP */}
-      <div className="flex items-center justify-between">
-        <h1 className="hidden md:block text-lg font-semibold">Все события</h1>
-        <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
+    <div className="bg-white p-3 md:p-4 rounded-md flex-1 m-2 md:m-4 mt-0">
+      {/* ✅ Адаптивный заголовок */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+        <h1 className="text-lg md:text-xl font-semibold">Все события</h1>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
           <TableSearch />
-          <div className="flex items-center gap-4 self-end">
+          <div className="flex items-center gap-2 justify-end">
             <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
               <Image src="/filter.png" alt="Фильтр" width={14} height={14} />
             </button>
@@ -234,8 +310,8 @@ const EventListPage = async ({
         </div>
       </div>
 
-      {/* Статистика */}
-      <div className="flex gap-4 my-4">
+      {/* ✅ Адаптивная статистика */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 md:gap-4 mb-4">
         <div className="bg-blue-50 border border-blue-200 px-3 py-2 rounded-md text-sm">
           <span className="font-medium text-blue-800">Всего событий: </span>
           <span className="text-blue-600">{count}</span>
@@ -254,11 +330,26 @@ const EventListPage = async ({
         </div>
       </div>
 
-      {/* LIST */}
+      {/* ✅ Адаптивный список */}
       {data.length > 0 ? (
-        <Table columns={columns} renderRow={renderRow} data={data} />
+        <>
+          {/* Десктопная таблица */}
+          <div className="hidden md:block">
+            <Table columns={columns} renderRow={renderRow} data={data} />
+          </div>
+
+          {/* Мобильные карточки */}
+          <div className="md:hidden">
+            {data.map((item) => (
+              <MobileEventCard key={item.id} item={item} />
+            ))}
+          </div>
+        </>
       ) : (
         <div className="text-center py-8">
+          <div className="mb-4">
+            <Image src="/noData.png" alt="Нет данных" width={64} height={64} className="mx-auto opacity-50" />
+          </div>
           <p className="text-gray-400 mb-4">Событий не найдено</p>
           {role === "admin" && (
             <FormContainer table="event" type="create" />
@@ -266,14 +357,10 @@ const EventListPage = async ({
         </div>
       )}
 
-      {/* PAGINATION */}
-      <Pagination page={p} count={count} />
-
-      {/* CALENDAR */}
-      {/* <div className="mt-8">
-        <h2 className="text-lg font-semibold mb-4">Календарь событий</h2>
-        <EventCalendarContainer searchParams={searchParams} />
-      </div> */}
+      {/* ✅ Адаптивная пагинация */}
+      <div className="mt-4">
+        <Pagination page={p} count={count} />
+      </div>
     </div>
   );
 };

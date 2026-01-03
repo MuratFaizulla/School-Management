@@ -140,7 +140,7 @@ const FormModal = ({
 
     useEffect(() => {
       if (state.success) {
-        toast(`${table} has been deleted!`);
+        toast(`${table} Успешно удалено!`, { type: "success" });
         setOpen(false);
         router.refresh();
       }
@@ -171,19 +171,43 @@ const FormModal = ({
       >
         <Image src={`/${type}.png`} alt="" width={16} height={16} />
       </button>
-      {open && (
-        <div className="w-screen h-screen absolute left-0 top-0 bg-black bg-opacity-60 z-50 flex items-center justify-center">
-          <div className="bg-white p-4 rounded-md relative w-[90%] md:w-[70%] lg:w-[60%] xl:w-[50%] 2xl:w-[40%]">
-            <Form />
-            <div
-              className="absolute top-4 right-4 cursor-pointer"
-              onClick={() => setOpen(false)}
-            >
-              <Image src="/close.png" alt="" width={14} height={14} />
-            </div>
-          </div>
-        </div>
-      )}
+    {open && (
+  <div 
+    className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4"
+    onClick={(e) => {
+      if (e.target === e.currentTarget) {
+        setOpen(false);
+      }
+    }}
+  >
+    <div 
+      className="bg-white rounded-md relative w-[90%] md:w-[70%] lg:w-[60%] xl:w-[50%] 2xl:w-[40%] max-h-[90vh] overflow-hidden"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* ✅ Контент с кастомным скрытием scrollbar */}
+      <div 
+        className="max-h-[90vh] p-4 overflow-auto"
+        style={{
+          scrollbarWidth: 'none', /* Firefox */
+        }}
+      >
+        <style jsx>{`
+          div::-webkit-scrollbar {
+            display: none;
+          }
+        `}</style>
+        <Form />
+      </div>
+      
+      <div
+        className="absolute top-4 right-4 cursor-pointer z-10 w-6 h-6 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full"
+        onClick={() => setOpen(false)}
+      >
+        <Image src="/close.png" alt="Закрыть" width={12} height={12} />
+      </div>
+    </div>
+  </div>
+)}
     </>
   );
 };
