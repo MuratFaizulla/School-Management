@@ -44,12 +44,15 @@ const TeacherMetricCard = ({
   return href ? <Link href={href}>{content}</Link> : content;
 };
 
-// ✅ Компонент для списка событий
+// ✅ Компонент для списка событий (только тим-лидер)
 const EventCard = ({ event }: { event: any }) => (
   <div className="bg-white border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors">
     <div className="flex items-start justify-between">
       <div className="flex-1">
-        <h3 className="font-medium text-gray-900 mb-1">{event.title}</h3>
+        <div className="flex items-center gap-2 mb-2">
+          <h3 className="font-medium text-gray-900">{event.title}</h3>
+          {/* 🔒 Убрали badge роли - теперь только тим-лидер */}
+        </div>
         <p className="text-sm text-gray-600 mb-2">{event.description}</p>
         
         <div className="flex items-center gap-4 text-xs text-gray-500">
@@ -59,6 +62,11 @@ const EventCard = ({ event }: { event: any }) => (
           <span className="flex items-center gap-1">
             ⏰ {new Date(event.startTime).toLocaleTimeString('ru-RU', { timeStyle: 'short' })}
           </span>
+          {event.class && (
+            <span className="flex items-center gap-1">
+              🎓 {event.class.name}
+            </span>
+          )}
           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
             event.feedback 
               ? 'bg-green-100 text-green-700' 
@@ -85,7 +93,8 @@ const TeacherPage = async () => {
   // ✅ Получаем данные учителя
   const [
     teacherData,
-    teacherEvents,
+    teacherEventsAsLeader,
+    // teacherEventsAsParticipant, // 🔒 Закомментировано - учитель видит только события где он тим-лидер
     teacherLessons,
     recentFeedbacks
   ] = await Promise.all([
@@ -95,21 +104,37 @@ const TeacherPage = async () => {
       select: { name: true, surname: true, email: true }
     }),
     
-    // События контроля для этого учителя
+    // ✅ События где учитель - тим-лидер
     prisma.event.findMany({
-      where: { teacherId: userId! },
+      where: { teamLeaderId: userId! },
       include: { 
         feedback: true,
-        lesson: {
-          include: {
-            subject: true,
-            class: true
-          }
+        class: {
+          select: { name: true }
         }
       },
       orderBy: { startTime: 'desc' },
-      take: 5
+      take: 5 // ✅ Увеличил до 5, так как больше не объединяем с участниками
     }),
+    
+    // 🔒 ЗАКОММЕНТИРОВАНО - учитель не должен видеть события где он участник
+    // prisma.event.findMany({
+    //   where: {
+    //     participants: {
+    //       some: {
+    //         teacherId: userId!
+    //       }
+    //     }
+    //   },
+    //   include: { 
+    //     feedback: true,
+    //     class: {
+    //       select: { name: true }
+    //     }
+    //   },
+    //   orderBy: { startTime: 'desc' },
+    //   take: 3
+    // }),
     
     // Уроки учителя
     prisma.lesson.findMany({
@@ -121,11 +146,20 @@ const TeacherPage = async () => {
       take: 3
     }),
     
-    // Последние обратные связи
+    // ✅ Последние обратные связи (только где учитель тим-лидер)
     prisma.feedback.findMany({
       where: {
         event: {
-          teacherId: userId!
+          teamLeaderId: userId! // 🔒 Только тим-лидер
+          // 🔒 ЗАКОММЕНТИРОВАНО - убрали OR с участниками
+          // OR: [
+          //   { teamLeaderId: userId! },
+          //   { 
+          //     participants: {
+          //       some: { teacherId: userId! }
+          //     }
+          //   }
+          // ]
         }
       },
       include: {
@@ -136,9 +170,18 @@ const TeacherPage = async () => {
     })
   ]);
 
+  // ✅ Только события как тим-лидер (без участников)
+  const allEvents = teacherEventsAsLeader.map(event => ({ ...event, role: 'teamLeader' as const }));
+  
+  // 🔒 ЗАКОММЕНТИРОВАНО - объединение с участниками
+  // const allEvents = [
+  //   ...teacherEventsAsLeader.map(event => ({ ...event, role: 'teamLeader' as const })),
+  //   ...teacherEventsAsParticipant.map(event => ({ ...event, role: 'participant' as const })),
+  // ].sort((a, b) => b.startTime.getTime() - a.startTime.getTime()).slice(0, 5);
+
   // ✅ Вычисляем статистику
-  const totalEvents = teacherEvents.length;
-  const completedEvents = teacherEvents.filter(event => event.feedback).length;
+  const totalEvents = allEvents.length;
+  const completedEvents = allEvents.filter(event => event.feedback).length;
   const pendingEvents = totalEvents - completedEvents;
   const completionRate = totalEvents > 0 ? Math.round((completedEvents / totalEvents) * 100) : 0;
 
@@ -161,8 +204,8 @@ const TeacherPage = async () => {
           <TeacherMetricCard
             title="Мои события"
             value={totalEvents}
-            subtitle="Всего наблюдений"
-            icon="📅"
+            subtitle="Как тим-лидер"
+            icon="👨‍🏫"
             color="blue"
             href="/list/events"
           />
@@ -196,7 +239,7 @@ const TeacherPage = async () => {
               📚 Мои уроки
             </h2>
             <Link 
-  href={`/list/lessons?search=${encodeURIComponent(teacherData?.name || '')}`} // ✅ Добавляем параметр учителя
+              href={`/list/lessons?search=${encodeURIComponent(teacherData?.name || '')}`}
               className="text-sm text-blue-600 hover:text-blue-800 font-medium"
             >
               Все уроки →
@@ -234,11 +277,11 @@ const TeacherPage = async () => {
           )}
         </div>
 
-        {/* ✅ События контроля */}
+        {/* ✅ События контроля (только где тим-лидер) */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              👁️ Мои события контроля
+              👨‍🏫 Мои события (тим-лидер)
             </h2>
             <Link 
               href="/list/events"
@@ -249,12 +292,12 @@ const TeacherPage = async () => {
           </div>
           
           <div className="space-y-3">
-            {teacherEvents.map((event) => (
+            {allEvents.map((event) => (
               <EventCard key={event.id} event={event} />
             ))}
           </div>
           
-          {teacherEvents.length === 0 && (
+          {allEvents.length === 0 && (
             <div className="text-center py-8">
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-2xl text-gray-400">📅</span>
@@ -309,12 +352,21 @@ const TeacherPage = async () => {
                 <p className="text-sm text-gray-600 mb-2">
                   <span className="font-medium">Наблюдатель:</span> {feedback.observerName}
                 </p>
-                {feedback.recommendations && (
+                {/* ✅ Показываем любые доступные рекомендации */}
+                {(feedback.recommendationsTable1 || feedback.recommendationsTable2 || feedback.recommendationsTable3) && (
                   <p className="text-xs text-gray-600 bg-white p-2 rounded border">
                     <span className="font-medium">Рекомендации:</span> {
-                      feedback.recommendations.length > 100 
-                        ? `${feedback.recommendations.substring(0, 100)}...` 
-                        : feedback.recommendations
+                      (() => {
+                        const allRecommendations = [
+                          feedback.recommendationsTable1,
+                          feedback.recommendationsTable2,
+                          feedback.recommendationsTable3
+                        ].filter(Boolean).join(' ');
+                        
+                        return allRecommendations.length > 100 
+                          ? `${allRecommendations.substring(0, 100)}...` 
+                          : allRecommendations;
+                      })()
                     }
                   </p>
                 )}
@@ -356,7 +408,7 @@ const TeacherPage = async () => {
             </Link>
             
             <Link 
-              href={`/list/lessons?search=${encodeURIComponent(teacherData?.name|| '')}`} // ✅ Добавляем параметр учителя
+              href={`/list/lessons?search=${encodeURIComponent(teacherData?.name || '')}`}
               className="flex items-center gap-3 p-3 bg-green-50 hover:bg-green-100 rounded-lg transition-colors group"
             >
               <span className="text-xl">📚</span>

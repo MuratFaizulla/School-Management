@@ -23,14 +23,26 @@ const SingleTeacherPage = async ({
           subjects: number;
           lessons: number;
           classes: number;
-          events: number;
+          eventsAsTeamLeader: number;
+          eventParticipations: number;
         };
-        events: {
+        eventsAsTeamLeader: {
           id: number;
           title: string;
           startTime: Date;
           controllerType: string;
+          class: { name: string } | null;
           feedback?: { id: number } | null;
+        }[];
+        eventParticipations: {
+          event: {
+            id: number;
+            title: string;
+            startTime: Date;
+            controllerType: string;
+            class: { name: string } | null;
+            feedback?: { id: number } | null;
+          };
         }[];
       })
     | null = await prisma.teacher.findUnique({
@@ -41,19 +53,47 @@ const SingleTeacherPage = async ({
           subjects: true,
           lessons: true,
           classes: true,
-          events: true, // События где этот учитель контролируется
+          eventsAsTeamLeader: true, // События где тим-лидер
+          eventParticipations: true, // События где участник
         },
       },
-      events: {
-        take: 5, // Последние 5 событий
+      eventsAsTeamLeader: {
+        take: 3, // Последние 3 события как тим-лидер
         orderBy: { startTime: "desc" },
         select: {
           id: true,
           title: true,
           startTime: true,
           controllerType: true,
+          class: {
+            select: { name: true },
+          },
           feedback: {
             select: { id: true },
+          },
+        },
+      },
+      eventParticipations: {
+        take: 3, // Последние 3 события как участник
+        orderBy: {
+          event: {
+            startTime: "desc",
+          },
+        },
+        select: {
+          event: {
+            select: {
+              id: true,
+              title: true,
+              startTime: true,
+              controllerType: true,
+              class: {
+                select: { name: true },
+              },
+              feedback: {
+                select: { id: true },
+              },
+            },
           },
         },
       },
@@ -64,12 +104,32 @@ const SingleTeacherPage = async ({
     return notFound();
   }
 
+  // ✅ Объединяем события (тим-лидер + участник)
+  const allEvents = [
+    ...teacher.eventsAsTeamLeader.map(event => ({ ...event, role: 'teamLeader' as const })),
+    ...teacher.eventParticipations.map(p => ({ ...p.event, role: 'participant' as const })),
+  ].sort((a, b) => b.startTime.getTime() - a.startTime.getTime()).slice(0, 5);
+
+  // Подсчет общего количества событий
+  const totalEvents = teacher._count.eventsAsTeamLeader + teacher._count.eventParticipations;
+
   // Подсчет статистики обратной связи
-  const eventsWithFeedback = teacher.events.filter((event) => event.feedback);
+  const eventsWithFeedback = allEvents.filter((event) => event.feedback);
   const feedbackRate =
-    teacher.events.length > 0
-      ? Math.round((eventsWithFeedback.length / teacher.events.length) * 100)
+    allEvents.length > 0
+      ? Math.round((eventsWithFeedback.length / allEvents.length) * 100)
       : 0;
+
+  const translateControllerType = (type: string) => {
+    const translations: { [key: string]: string } = {
+      DIRECTOR: "Директор",
+      DEPUTY_UC: "Завуч по УР",
+      DEPUTY_VP: "Завуч по ВР",
+      DEPUTY_NMR: "Завуч по НМР",
+      DEPUTY_VS: "Завуч по ВС",
+    };
+    return translations[type] || type;
+  };
 
   return (
     <div className="flex-1 p-4 flex flex-col gap-4 xl:flex-row">
@@ -177,7 +237,7 @@ const SingleTeacherPage = async ({
               />
               <div>
                 <h1 className="text-xl font-semibold">
-                  {teacher._count.events}
+                  {totalEvents}
                 </h1>
                 <span className="text-sm text-gray-400">События контроля</span>
               </div>
@@ -194,39 +254,90 @@ const SingleTeacherPage = async ({
 
       {/* RIGHT */}
       <div className="w-full xl:w-1/3 flex flex-col gap-4">
+        {/* Статистика участия */}
+        <div className="bg-white p-4 rounded-md">
+          <h1 className="text-lg font-semibold mb-4">Статистика участия</h1>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-3 bg-blue-50 rounded-md">
+              <div>
+                <div className="text-sm text-gray-600">Тим-лидер</div>
+                <div className="text-2xl font-semibold text-blue-600">
+                  {teacher._count.eventsAsTeamLeader}
+                </div>
+              </div>
+              <div className="text-3xl">👨‍🏫</div>
+            </div>
+            
+            <div className="flex items-center justify-between p-3 bg-purple-50 rounded-md">
+              <div>
+                <div className="text-sm text-gray-600">Участник</div>
+                <div className="text-2xl font-semibold text-purple-600">
+                  {teacher._count.eventParticipations}
+                </div>
+              </div>
+              <div className="text-3xl">👥</div>
+            </div>
+            
+            <div className="flex items-center justify-between p-3 bg-green-50 rounded-md">
+              <div>
+                <div className="text-sm text-gray-600">Заполнено листов</div>
+                <div className="text-2xl font-semibold text-green-600">
+                  {feedbackRate}%
+                </div>
+              </div>
+              <div className="text-3xl">📋</div>
+            </div>
+          </div>
+        </div>
+
         {/* События контроля */}
         <div className="bg-white p-4 rounded-md">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-lg font-semibold">События контроля</h1>
-            <span className="text-sm text-gray-500">
-              Заполнено: {feedbackRate}%
-            </span>
+            <h1 className="text-lg font-semibold">Последние события</h1>
+            <Link 
+              href={`/list/events?teamLeaderId=${teacher.id}`}
+              className="text-xs text-blue-600 hover:text-blue-800"
+            >
+              Все события →
+            </Link>
           </div>
 
-          {teacher.events.length > 0 ? (
+          {allEvents.length > 0 ? (
             <div className="space-y-3">
-              {teacher.events.map((event) => (
+              {allEvents.map((event) => (
                 <Link
                   key={event.id}
                   href={`/list/events/${event.id}`}
                   className="block p-3 bg-gray-50 rounded-md hover:bg-gray-100 transition-colors"
                 >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-medium text-sm">{event.title}</div>
-                      <div className="text-xs text-gray-500">
-                        {event.startTime.toLocaleDateString("ru-RU")}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          event.role === 'teamLeader' 
+                            ? 'bg-blue-100 text-blue-700' 
+                            : 'bg-purple-100 text-purple-700'
+                        }`}>
+                          {event.role === 'teamLeader' ? '👨‍🏫 Тим-лидер' : '👥 Участник'}
+                        </span>
                       </div>
-                      <div className="text-xs text-blue-600">
-                        {event.controllerType === "DIRECTOR" && "Директор"}
-                        {event.controllerType === "DEPUTY" && "Завуч"}
-                        {event.controllerType === "METHODIST" && "Методист"}
-                        {event.controllerType === "INSPECTOR" && "Инспектор"}
-                        {event.controllerType === "ADMIN" && "Администратор"}
-                        {event.controllerType === "TEACHER" && "Учитель"}
+                      <div className="font-medium text-sm truncate">{event.title}</div>
+                      <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                        <span>
+                          {event.startTime.toLocaleDateString("ru-RU")}
+                        </span>
+                        {event.class && (
+                          <>
+                            <span>•</span>
+                            <span>{event.class.name}</span>
+                          </>
+                        )}
+                      </div>
+                      <div className="text-xs text-blue-600 mt-1">
+                        {translateControllerType(event.controllerType)}
                       </div>
                     </div>
-                    <div className="text-xs">
+                    <div className="text-xs flex-shrink-0">
                       {event.feedback ? (
                         <span className="text-green-600">✓ Есть лист</span>
                       ) : (
@@ -252,12 +363,6 @@ const SingleTeacherPage = async ({
             >
               📚 Классы учителя
             </Link>
-            {/* <Link
-              className="p-3 rounded-md bg-lamaPurpleLight hover:bg-purple-200 transition-colors"
-              href={`/list/students?teacherId=${teacher.id}`}
-            >
-              👥 Ученики учителя
-            </Link> */}
             <Link
               className="p-3 rounded-md bg-lamaYellowLight hover:bg-yellow-200 transition-colors"
               href={`/list/lessons?teacherId=${teacher.id}`}
@@ -265,10 +370,16 @@ const SingleTeacherPage = async ({
               📖 Уроки учителя
             </Link>
             <Link
-              className="p-3 rounded-md bg-green-50 hover:bg-green-200 transition-colors"
-              href={`/list/events?teacherId=${teacher.id}`}
+              className="p-3 rounded-md bg-blue-50 hover:bg-blue-200 transition-colors"
+              href={`/list/events?teamLeaderId=${teacher.id}`}
             >
-              🎯 События контроля
+              👨‍🏫 События как тим-лидер
+            </Link>
+            <Link
+              className="p-3 rounded-md bg-purple-50 hover:bg-purple-200 transition-colors"
+              href={`/list/events`}
+            >
+              🎯 Все события контроля
             </Link>
           </div>
         </div>

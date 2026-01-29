@@ -20,7 +20,7 @@ export const classSchema = z.object({
   name: z.string()
     .min(1, { message: "Название класса обязательно!" })
     .max(10, { message: "Название класса должно быть не более 10 символов!" })
-    .regex(/^\d{1,2}[А-Я]$/, { message: "Название должно быть в формате 9А, 10Б и т.д." }),
+    .regex(/^\d{1,2}[A-Z]$/, { message: "Название должно быть в формате 9А, 10Б и т.д." }),
   capacity: z.coerce.number()
     .min(1, { message: "Вместимость класса обязательна!" })
     .max(20, { message: "Максимальная вместимость 20 учеников!" }),
@@ -59,9 +59,6 @@ export const teacherSchema = z.object({
 export type TeacherSchema = z.infer<typeof teacherSchema>;
 
 
-
-
-
 // LESSON SCHEMA
 export const lessonSchema = z
   .object({
@@ -96,9 +93,6 @@ export const lessonSchema = z
 export type LessonSchema = z.infer<typeof lessonSchema>;
 
 
-
-
-
 // EVENT SCHEMA  
 export const eventSchema = z
   .object({
@@ -118,11 +112,18 @@ export const eventSchema = z
     controllerType: z.nativeEnum(ControllerType, {
       errorMap: () => ({ message: "Тип контролирующего обязателен!" }),
     }),
-    // ❌ Убрали controllerId и classId
-    teacherId: z
+    // Тим-лидер (руководитель группы)
+    teamLeaderId: z
       .string()
-      .min(1, { message: "Учитель обязателен!" }),
-    lessonId: z.coerce.number().optional(),
+      .min(1, { message: "Тим-лидер обязателен!" }),
+    // Участники контроля (массив ID учителей)
+    participants: z.array(z.string()).min(1, {
+      message: "Должен быть хотя бы один участник!",
+    }),
+    // Класс обязателен
+    classId: z.coerce.number({
+      required_error: "Класс обязателен!",
+    }),
   })
   .refine((data) => data.endTime > data.startTime, {
     message: "Время окончания должно быть позже времени начала!",
@@ -130,10 +131,6 @@ export const eventSchema = z
   });
 
 export type EventSchema = z.infer<typeof eventSchema>;
-
-
-
-
 
 
 // FEEDBACK SCHEMA
@@ -156,9 +153,6 @@ export const feedbackSchema = z.object({
   grade: z.string().min(1, {
     message: "Параллель обязательна!",
   }),
-  presentTeachersCount: z.coerce.number().min(1, {
-    message: "Количество учителей должно быть больше 0!",
-  }),
 
   // ТАБЛИЦА 1: Вопросы для наблюдения
   hasTeamLeader: z.boolean(),
@@ -169,6 +163,10 @@ export const feedbackSchema = z.object({
   effectiveCollaboration: z.boolean(),
   analyzePreviousLessons: z.boolean(),
 
+  // Комментарии и рекомендации для Таблицы 1
+  commentsTable1: z.string().optional(),
+  recommendationsTable1: z.string().optional(),
+
   // ТАБЛИЦА 2: Исходные данные при планировании
   useLessonReflection: z.boolean(),
   useStudentAchievements: z.boolean(),
@@ -178,6 +176,10 @@ export const feedbackSchema = z.object({
   useStudentFeedback: z.boolean(),
   useOtherData: z.boolean(),
   otherDataDescription: z.string().optional(),
+
+  // Комментарии и рекомендации для Таблицы 2
+  commentsTable2: z.string().optional(),
+  recommendationsTable2: z.string().optional(),
 
   // ТАБЛИЦА 3: В процессе планирования
   discussGoalsAlignment: z.boolean(),
@@ -193,9 +195,9 @@ export const feedbackSchema = z.object({
   defineHomework: z.boolean(),
   considerSafety: z.boolean(),
 
-  // ТАБЛИЦА 4: Текстовые поля
-  comments: z.string().optional(),
-  recommendations: z.string().optional(),
+  // Комментарии и рекомендации для Таблицы 3
+  commentsTable3: z.string().optional(),
+  recommendationsTable3: z.string().optional(),
 
   // Связь с событием
   eventId: z.coerce.number({

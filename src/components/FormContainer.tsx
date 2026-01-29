@@ -57,33 +57,20 @@ const FormContainer = async ({ table, type, data, id }: FormContainerProps) => {
         break;
 
       // ✅ Исправленный case "event"
-      case "event":
-        const eventTeachers = await prisma.teacher.findMany({
-          select: { id: true, name: true, surname: true },
-        });
-        const eventLessons = await prisma.lesson.findMany({
-          select: { 
-            id: true, 
-            name: true, 
-            startTime: true, 
-            endTime: true,
-            teacherId: true, // ✅ Добавили teacherId для фильтрации!
-            class: {
-              select: { name: true }
-            },
-            subject: {
-              select: { name: true }
-            }
-          },
-          orderBy: [
-            { startTime: 'asc' }
-          ]
-        });
-        relatedData = {
-          teachers: eventTeachers,
-          lessons: eventLessons,
-        };
-        break;
+     case "event":
+  const eventTeachers = await prisma.teacher.findMany({
+    select: { id: true, name: true, surname: true },
+    orderBy: [{ surname: 'asc' }, { name: 'asc' }]
+  });
+  const eventClasses = await prisma.class.findMany({
+    select: { id: true, name: true, gradeLevel: true },
+    orderBy: { name: 'asc' }
+  });
+  relatedData = {
+    teachers: eventTeachers,  // ✅ Для тим-лидера и участников
+    classes: eventClasses,     // ✅ Для выбора класса
+  };
+  break;
 
       // case "feedback":
       //   const feedbackEvents = await prisma.event.findMany({
@@ -110,31 +97,22 @@ case "feedback":
       feedback: null, // Только события без обратной связи
     },
     include: {
-      teacher: {
+      teamLeader: {                    // ✅ Тим-лидер
         select: { id: true, name: true, surname: true },
       },
-      lesson: {
-        select: {
-          id: true,
-          name: true,
-          day: true,        // ✅ День недели (enum)
-          startTime: true,  // ✅ Время урока
-          endTime: true,    // ✅ Время урока
-          subject: {
-            select: { name: true }
-          },
-          class: {
-            select: { name: true }
+      participants: {                  // ✅ Участники через промежуточную таблицу
+        include: {
+          teacher: {
+            select: { id: true, name: true, surname: true }
           }
         }
+      },
+      class: {                         // ✅ Класс
+        select: { id: true, name: true }
       }
     },
     orderBy: { startTime: 'desc' }
   });
-  relatedData = {
-    events: feedbackEvents,
-  };
-  break;
 
       default:
         break;

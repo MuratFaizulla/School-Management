@@ -11,8 +11,6 @@ datasource db {
 model Admin {
   id       String @id           // Уникальный ID администратора
   username String @unique      // Логин администратора
-  
-  // controlEvents Event[]        // События контроля которые проводит
 }
 
 // Учителя школы
@@ -28,7 +26,12 @@ model Teacher {
   subjects  Subject[]                         // Предметы, которые ведет учитель
   lessons   Lesson[]                          // Уроки учителя
   classes   Class[]                           // Классы, которыми руководит
-  events    Event[]                           // События контроля учителя (которого контролируют)
+  
+  // События где учитель является тим-лидером
+  eventsAsTeamLeader Event[] @relation("TeamLeader")
+  
+  // События где учитель является участником
+  eventParticipations EventParticipant[] @relation("Participants")
 }
 
 // Классы (например 9А, 10Б)
@@ -40,7 +43,7 @@ model Class {
   supervisorId String?                               // ID классного руководителя
   supervisor   Teacher?       @relation(fields: [supervisorId], references: [id])    // Классный руководитель
   lessons      Lesson[]                              // Уроки класса
-  // events       Event[]                               // События контроля класса
+  events       Event[]                               // События контроля класса
   announcements Announcement[]                       // Объявления для класса
 }
 
@@ -65,7 +68,6 @@ model Lesson {
   class       Class        @relation(fields: [classId], references: [id])       // Класс, у которого урок
   teacherId   String                                // ID учителя
   teacher     Teacher      @relation(fields: [teacherId], references: [id])     // Учитель урока
-  events      Event[]                               // События контроля этого урока
 }
 
 // Школьные события / Контроль уроков (ПЛАНИРОВАНИЕ контроля)
@@ -76,70 +78,89 @@ model Event {
   startTime   DateTime                               // Время начала контроля
   endTime     DateTime                               // Время окончания контроля
   controllerType ControllerType                      // ТИП контролера (директор, завуч и т.д.)
-  // controllerId   String                              // ID конкретного человека кто контролирует
-  // controller     Admin  @relation(fields: [controllerId], references: [id]) // Кто контролирует
-  teacherId   String                                 // ID учителя КОТОРОГО контролируют
-  teacher     Teacher  @relation(fields: [teacherId], references: [id]) // Учитель урока
-  lessonId    Int?                                   // ID урока (НЕОБЯЗАТЕЛЬНО)
-  lesson      Lesson?  @relation(fields: [lessonId], references: [id])  // Урок который контролируют
-  // classId     Int?                                   // ID класса (НЕОБЯЗАТЕЛЬНО)
-  // class       Class?   @relation(fields: [classId], references: [id])   // Класс события
+  
+  // Тим-лидер (руководитель группы учителей)
+  teamLeaderId String                                // ID учителя тим-лидера
+  teamLeader   Teacher  @relation("TeamLeader", fields: [teamLeaderId], references: [id]) // Тим-лидер
+  
+  // Участники (массив учителей)
+  participants EventParticipant[]                    // Участники контроля
+  
+  // Класс
+  classId     Int                                    // ID класса (ОБЯЗАТЕЛЬНО)
+  class       Class    @relation(fields: [classId], references: [id])   // Класс события
+  
   feedback    Feedback?                              // Детальная обратная связь после контроля
+}
+
+// Промежуточная таблица для участников события (many-to-many)
+model EventParticipant {
+  id        Int      @id @default(autoincrement())
+  eventId   Int                                      // ID события
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  teacherId String                                   // ID учителя-участника
+  teacher   Teacher  @relation("Participants", fields: [teacherId], references: [id])
+  
+  @@unique([eventId, teacherId])                     // Один учитель не может быть добавлен дважды в одно событие
 }
 
 // Лист наблюдения еженедельного планирования урока (ПОСЛЕ контроля)
 model Feedback {
-  id              Int      @id @default(autoincrement()) // Уникальный ID
-  createdAt       DateTime @default(now())               // Время создания
-  
-  // ОСНОВНАЯ ИНФОРМАЦИЯ
-  observerName           String                          // ФИО наблюдателя
-  observationDate        DateTime                        // Дата наблюдения
-  observationTime        String                          // Время наблюдения
-  subject                String                          // Предмет
-  grade                  String                          // Параллель
-  presentTeachersCount   Int                             // Количество присутствующих учителей
-  
-  // ТАБЛИЦА 1: Вопросы для наблюдения (да/нет)
-  hasTeamLeader          Boolean                         // Имеется ли в группе тим-лидер?
-  hasAgenda              Boolean                         // Определена ли повестка заседания?
-  isProcessDocumented    Boolean                         // Фиксируется ли процесс планирования?
-  teachersShowInterest   Boolean                         // Проявляют ли учителя интерес при планировании?
-  teachersGiveSuggestions Boolean                        // Активно ли вносят предложения?
-  effectiveCollaboration Boolean                         // Эффективно ли сотрудничают?
-  analyzePreviousLessons Boolean                         // Проводится ли анализ предыдущих уроков?
-  
-  // ТАБЛИЦА 2: Исходные данные при планировании (да/нет)
-  useLessonReflection    Boolean                         // Рефлексия урока
-  useStudentAchievements Boolean                         // Учебные достижения учащихся
-  useExternalAssessment  Boolean                         // Аналитический отчет от ЦПИ
-  usePedagogicalDecisions Boolean                        // Рекомендации педсовета
-  useLessonVisitResults  Boolean                         // Результаты посещения уроков
-  useStudentFeedback     Boolean                         // Обратная связь от учащихся
-  useOtherData           Boolean                         // Прочее
-  otherDataDescription   String?                         // Описание прочих данных
-  
-  // ТАБЛИЦА 3: В процессе планирования учителя параллели (да/нет)
-  discussGoalsAlignment     Boolean                      // Обсуждают соответствие цели стандартам
-  adaptLearningGoals        Boolean                      // Адаптируют цели к уроку (40 мин)
-  selectAppropriateResources Boolean                     // Выбирают подходящие ресурсы
-  selectDifferentiatedStrategies Boolean                 // Подбирают стратегии для разных потребностей
-  selectEngagingTasks       Boolean                      // Подбирают интересные задания
-  discussDescriptors        Boolean                      // Обсуждают дескрипторы
-  allocateTime              Boolean                      // Распределяют время
-  selectFormativeAssessment Boolean                      // Выбирают формы оценивания
-  planReflection            Boolean                      // Планируют рефлексию
-  useICTTools               Boolean                      // Предусматривают ИКТ
-  defineHomework            Boolean                      // Определяют домашнее задание
-  considerSafety            Boolean                      // Предусматривают безопасность
-  
-  // ТАБЛИЦА 4: Текстовые поля
-  comments               String?                         // Комментарии
-  recommendations        String?                         // Рекомендации
-  
-  // Связи с другими таблицами
-  eventId                Int      @unique                // ID события (связь 1:1)
-  event                  Event    @relation(fields: [eventId], references: [id]) // Событие контроля
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+
+  // Основная информация
+  observerName    String
+  observationDate DateTime
+  observationTime String
+  subject         String
+  grade           String
+
+  // Таблица 1
+  hasTeamLeader           Boolean
+  hasAgenda               Boolean
+  isProcessDocumented     Boolean
+  teachersShowInterest    Boolean
+  teachersGiveSuggestions Boolean
+  effectiveCollaboration  Boolean
+  analyzePreviousLessons  Boolean
+
+  commentsTable1        String?
+  recommendationsTable1 String?
+
+  // Таблица 2
+  useLessonReflection     Boolean
+  useStudentAchievements  Boolean
+  useExternalAssessment   Boolean
+  usePedagogicalDecisions Boolean
+  useLessonVisitResults   Boolean
+  useStudentFeedback      Boolean
+  useOtherData            Boolean
+  otherDataDescription    String?
+
+  commentsTable2        String?
+  recommendationsTable2 String?
+
+  // Таблица 3
+  discussGoalsAlignment      Boolean
+  adaptLearningGoals         Boolean
+  selectAppropriateResources Boolean
+  selectDifferentiatedStrategies Boolean
+  selectEngagingTasks        Boolean
+  discussDescriptors         Boolean
+  allocateTime               Boolean
+  selectFormativeAssessment  Boolean
+  planReflection             Boolean
+  useICTTools                Boolean
+  defineHomework             Boolean
+  considerSafety             Boolean
+
+  commentsTable3        String?
+  recommendationsTable3 String?
+
+  // Связь с событием
+  eventId Int    @unique
+  event   Event  @relation(fields: [eventId], references: [id])
 }
 
 // Объявления
@@ -163,10 +184,9 @@ enum Day {
 
 // Перечисление: кто контролирует урок
 enum ControllerType {
-  DIRECTOR     // Директор
-  DEPUTY       // Завуч/Заместитель директора
-  METHODIST    // Методист
-  INSPECTOR    // Инспектор
-  ADMIN        // Администратор
-  TEACHER      // Учитель (взаимопосещение)
+  DIRECTOR         // Директор  	Тусупжанов Айдын Елеусызович
+  DEPUTY_UC        // Заместитель директора по УР (Deputy for Academic Work)  	Ахатаева Жадыра Оразхановна
+  DEPUTY_VP        // Заместитель директора по ВР (Deputy for Educational Work)  Мурзабеков Айбар Бейбитович
+  DEPUTY_NMR       // Заместитель директора по НМР (Deputy for Scientific-Methodical Work)  Токтамысова Ибалы Талгатовна
+  DEPUTY_VS        // Заместитель директора по ВС (Deputy for Internal Control)  Тажибаев Асхат Куатович
 }

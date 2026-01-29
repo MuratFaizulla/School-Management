@@ -21,7 +21,6 @@ const FeedbackForm = ({
   setOpen: Dispatch<SetStateAction<boolean>>;
   relatedData?: any;
 }) => {
-  // ✅ Перемещаем деструктуризацию в начало
   const { events } = relatedData || { events: [] };
 
   const {
@@ -32,6 +31,9 @@ const FeedbackForm = ({
     formState: { errors },
   } = useForm<FeedbackSchema>({
     resolver: zodResolver(feedbackSchema),
+    defaultValues: {
+      eventId: data?.eventId || undefined,
+    }
   });
 
   const [state, formAction] = useFormState(
@@ -43,12 +45,36 @@ const FeedbackForm = ({
     }
   );
 
-  // ✅ Отслеживаем выбранное событие
   const selectedEventId = watch('eventId');
 
-  // ✅ Автоматическое заполнение данных из события
+  // ✅ Автозаполнение при первой загрузке если eventId передан
   useEffect(() => {
-    if (selectedEventId && events?.length > 0) {
+    if (type === "create" && data?.eventId && events?.length > 0) {
+      const selectedEvent = events.find((event: any) => event.id == data.eventId);
+      
+      if (selectedEvent) {
+        const eventDate = new Date(selectedEvent.startTime);
+        
+        (setValue as any)('observationDate', eventDate.toISOString().split('T')[0]);
+        
+        const timeString = eventDate.toLocaleTimeString('ru-RU', { 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        });
+        (setValue as any)('observationTime', timeString);
+        
+        if (selectedEvent.class) {
+          (setValue as any)('grade', selectedEvent.class.name);
+        }
+        
+        toast.info(`Автозаполнение для события: ${selectedEvent.title}`);
+      }
+    }
+  }, [type, data?.eventId, events, setValue]);
+
+  // ✅ Автоматическое заполнение данных из события при изменении выбора
+  useEffect(() => {
+    if (selectedEventId && events?.length > 0 && !data?.eventId) { // Только если событие выбрано вручную
       const selectedEvent = events.find((event: any) => event.id == selectedEventId);
       
       if (selectedEvent) {
@@ -64,24 +90,18 @@ const FeedbackForm = ({
         });
         (setValue as any)('observationTime', timeString);
         
-        // ✅ Если есть связанный урок - берем предмет и класс
-        if (selectedEvent.lesson) {
-          if (selectedEvent.lesson.subject?.name) {
-            (setValue as any)('subject', selectedEvent.lesson.subject.name);
-          }
-          
-          if (selectedEvent.lesson.class?.name) {
-            (setValue as any)('grade', selectedEvent.lesson.class.name);
-          }
-          
-          toast.success(`Данные заполнены из урока: ${selectedEvent.lesson.subject?.name} - ${selectedEvent.lesson.class?.name}`);
-        } else {
-          // ✅ Если урока нет - просто уведомляем о заполнении времени
-          toast.success(`Время заполнено из события: ${selectedEvent.title}`);
+        // ✅ Берем данные из класса события
+        if (selectedEvent.class) {
+          (setValue as any)('grade', selectedEvent.class.name);
         }
+        
+        // ✅ Предмет пока оставляем пустым (его нужно вводить вручную)
+        // Можно было бы взять из уроков этого класса, но это усложнит логику
+        
+        toast.success(`Данные заполнены из события: ${selectedEvent.title}`);
       }
     }
-  }, [selectedEventId, events, setValue]);
+  }, [selectedEventId, events, setValue, data?.eventId]);
 
   const onSubmit = handleSubmit((data) => {
     console.log(data);
@@ -92,7 +112,7 @@ const FeedbackForm = ({
 
   useEffect(() => {
     if (state.success) {
-      toast(`Лист наблюдения был ${type === "create" ? "создан" : "обновлен"}!`);
+      toast.success(`Лист наблюдения был ${type === "create" ? "создан" : "обновлен"}!`);
       setOpen(false);
       router.refresh();
     }
@@ -108,101 +128,91 @@ const FeedbackForm = ({
       {type === "update" && data?.event && (
         <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
           <h3 className="font-medium text-blue-800 mb-2">Связанное событие</h3>
-          <div className="text-sm text-blue-700">
+          <div className="text-sm text-blue-700 space-y-1">
             <p><strong>Событие:</strong> {data.event.title}</p>
             <p><strong>Описание:</strong> {data.event.description}</p>
             <p><strong>Время:</strong> {new Date(data.event.startTime).toLocaleString('ru-RU')}</p>
+            <p><strong>Класс:</strong> {data.event.class?.name}</p>
+            <p><strong>Тим-лидер:</strong> {data.event.teamLeader?.name} {data.event.teamLeader?.surname}</p>
+            {data.event.participants?.length > 0 && (
+              <div>
+                <strong>Участники:</strong>
+                <ul className="ml-4 mt-1">
+                  {data.event.participants.map((p: any) => (
+                    <li key={p.id}>• {p.teacher.name} {p.teacher.surname}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </div>
       )}
 
       {/* ✅ Выбор события - только для создания */}
-   {type === "create" && (
-  <div className="bg-purple-50 border border-purple-200 p-4 rounded-lg">
-    <h3 className="font-medium text-purple-800 mb-3">Событие для наблюдения</h3>
-    <div className="flex flex-col gap-2">
-      <label className="text-xs text-gray-500">
-        Выберите событие контроля (остальные поля заполнятся автоматически)
-      </label>
-      <select
-        className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full"
-        {...register("eventId")}
-        defaultValue={data?.eventId || ""}
-      >
-        <option value="">Выберите событие</option>
-        {events?.map((event: any) => {
-          // ✅ Мапинг enum Day на русские названия
-          const dayMapping = {
-            'MONDAY': 'понедельник',
-            'TUESDAY': 'вторник', 
-            'WEDNESDAY': 'среда',
-            'THURSDAY': 'четверг',
-            'FRIDAY': 'пятница'
-          };
-
-          // ✅ Строим текст опции
-          let optionText = `${event.title} - ${event.teacher.name} ${event.teacher.surname}`;
-          
-          // ✅ Если есть урок - берем данные из урока
-          if (event.lesson) {
-            const className = event.lesson.class?.name || '';
-            const subjectName = event.lesson.subject?.name || '';
+      {type === "create" && (
+        <div className="bg-purple-50 border border-purple-200 p-4 rounded-lg">
+          <h3 className="font-medium text-purple-800 mb-3">Событие для наблюдения</h3>
+          <div className="flex flex-col gap-2">
+            <label className="text-xs text-gray-500">
+              Выберите событие контроля (остальные поля заполнятся автоматически)
+            </label>
+            <select
+              className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full disabled:bg-gray-100 disabled:cursor-not-allowed"
+              {...register("eventId")}
+              disabled={!!data?.eventId} // ✅ Блокируем если событие уже выбрано
+            >
+              <option value="">Выберите событие</option>
+              {events?.map((event: any) => {
+                const eventDate = new Date(event.startTime);
+                const dayNames = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
+                const eventDay = dayNames[eventDate.getDay()];
+                
+                const eventStartTime = eventDate.toLocaleTimeString('ru-RU', { 
+                  hour: '2-digit', 
+                  minute: '2-digit' 
+                });
+                const eventEndTime = new Date(event.endTime).toLocaleTimeString('ru-RU', { 
+                  hour: '2-digit', 
+                  minute: '2-digit' 
+                });
+                
+                // ✅ Строим текст: Событие - Класс - Тим-лидер (день, время)
+                const optionText = `${event.title} - ${event.class?.name || 'без класса'} - ${event.teamLeader.name} ${event.teamLeader.surname} (${eventDay}, ${eventStartTime}-${eventEndTime})`;
+                
+                return (
+                  <option value={event.id} key={event.id}>
+                    {optionText}
+                  </option>
+                );
+              })}
+            </select>
+            {errors.eventId?.message && (
+              <p className="text-xs text-red-400">
+                {errors.eventId.message.toString()}
+              </p>
+            )}
             
-            // ✅ Время урока из lesson
-            const lessonStartTime = new Date(event.lesson.startTime).toLocaleTimeString('ru-RU', { 
-              hour: '2-digit', 
-              minute: '2-digit' 
-            });
-            const lessonEndTime = new Date(event.lesson.endTime).toLocaleTimeString('ru-RU', { 
-              hour: '2-digit', 
-              minute: '2-digit' 
-            });
+            {/* ✅ Подсказка если событие уже выбрано */}
+            {data?.eventId && (
+              <div className="bg-blue-100 p-3 rounded-md border border-blue-200 mt-2">
+                <p className="text-sm text-blue-800">
+                  🔒 Событие уже выбрано и не может быть изменено
+                </p>
+              </div>
+            )}
             
-            // ✅ День недели из enum Day
-            const dayOfWeek = dayMapping[event.lesson.day as keyof typeof dayMapping] || event.lesson.day;
-            
-            optionText += ` ${className} ${subjectName} (${dayOfWeek}, ${lessonStartTime}-${lessonEndTime})`;
-          } else {
-            // ✅ Если урока нет - используем время события
-            const eventStartTime = new Date(event.startTime).toLocaleTimeString('ru-RU', { 
-              hour: '2-digit', 
-              minute: '2-digit' 
-            });
-            const eventEndTime = new Date(event.endTime).toLocaleTimeString('ru-RU', { 
-              hour: '2-digit', 
-              minute: '2-digit' 
-            });
-            const dayNames = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
-            const eventDay = dayNames[new Date(event.startTime).getDay()];
-            
-            optionText += ` (${eventDay}, ${eventStartTime}-${eventEndTime})`;
-          }
-          
-          return (
-            <option value={event.id} key={event.id}>
-              {optionText}
-            </option>
-          );
-        })}
-      </select>
-      {errors.eventId?.message && (
-        <p className="text-xs text-red-400">
-          {errors.eventId.message.toString()}
-        </p>
-      )}
-      
-      {selectedEventId && (
-        <div className="bg-white p-3 rounded-md border border-purple-200 mt-2">
-          <p className="text-sm text-purple-700">
-            ✅ Событие выбрано - данные заполнятся автоматически
-          </p>
+            {selectedEventId && !data?.eventId && (
+              <div className="bg-white p-3 rounded-md border border-purple-200 mt-2">
+                <p className="text-sm text-purple-700">
+                  ✅ Событие выбрано - дата и класс заполнятся автоматически
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       )}
-    </div>
-  </div>
-)}
 
-      {/* ✅ ОСНОВНАЯ ИНФОРМАЦИЯ - исправлен CSS grid */}
+      {/* ОСНОВНАЯ ИНФОРМАЦИЯ */}
       <div className="bg-gray-50 p-4 rounded-lg">
         <h2 className="text-lg font-medium mb-4 text-blue-800">Основная информация</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -248,17 +258,6 @@ const FeedbackForm = ({
             register={register}
             error={errors?.grade}
           />
-          
-          <div className="md:col-span-2">
-            <InputField
-              label="Количество присутствующих учителей"
-              name="presentTeachersCount"
-              type="number"
-              defaultValue={data?.presentTeachersCount}
-              register={register}
-              error={errors?.presentTeachersCount}
-            />
-          </div>
 
           {/* ✅ Для обновления - скрытые поля */}
           {type === "update" && (
@@ -288,7 +287,7 @@ const FeedbackForm = ({
 
       {/* ТАБЛИЦА 1: Вопросы для наблюдения */}
       <div className="bg-blue-50 p-4 rounded-lg">
-        <h2 className="text-lg font-medium mb-4 text-blue-800">Вопросы для наблюдения</h2>
+        <h2 className="text-lg font-medium mb-4 text-blue-800">Таблица 1: Вопросы для наблюдения</h2>
         <div className="grid grid-cols-1 gap-3">
           {[
             { key: "hasTeamLeader", label: "Имеется ли в группе тим-лидер?" },
@@ -310,11 +309,36 @@ const FeedbackForm = ({
             </div>
           ))}
         </div>
+        
+        {/* ✅ Комментарии и рекомендации для Таблицы 1 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <div className="flex flex-col gap-2">
+            <label className="text-sm text-blue-700 font-medium">Комментарии (Таблица 1)</label>
+            <textarea
+              {...register("commentsTable1")}
+              defaultValue={data?.commentsTable1 || ""}
+              rows={3}
+              className="ring-[1.5px] ring-gray-300 p-3 rounded-md text-sm resize-none w-full"
+              placeholder="Комментарии по наблюдению..."
+            />
+          </div>
+          
+          <div className="flex flex-col gap-2">
+            <label className="text-sm text-blue-700 font-medium">Рекомендации (Таблица 1)</label>
+            <textarea
+              {...register("recommendationsTable1")}
+              defaultValue={data?.recommendationsTable1 || ""}
+              rows={3}
+              className="ring-[1.5px] ring-gray-300 p-3 rounded-md text-sm resize-none w-full"
+              placeholder="Рекомендации..."
+            />
+          </div>
+        </div>
       </div>
 
       {/* ТАБЛИЦА 2: Исходные данные при планировании */}
       <div className="bg-green-50 p-4 rounded-lg">
-        <h2 className="text-lg font-medium mb-4 text-green-800">Исходные данные при планировании</h2>
+        <h2 className="text-lg font-medium mb-4 text-green-800">Таблица 2: Исходные данные при планировании</h2>
         <div className="grid grid-cols-1 gap-3">
           {[
             { key: "useLessonReflection", label: "Рефлексия урока" },
@@ -347,11 +371,36 @@ const FeedbackForm = ({
             error={errors?.otherDataDescription}
           />
         </div>
+        
+        {/* ✅ Комментарии и рекомендации для Таблицы 2 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <div className="flex flex-col gap-2">
+            <label className="text-sm text-green-700 font-medium">Комментарии (Таблица 2)</label>
+            <textarea
+              {...register("commentsTable2")}
+              defaultValue={data?.commentsTable2 || ""}
+              rows={3}
+              className="ring-[1.5px] ring-gray-300 p-3 rounded-md text-sm resize-none w-full"
+              placeholder="Комментарии..."
+            />
+          </div>
+          
+          <div className="flex flex-col gap-2">
+            <label className="text-sm text-green-700 font-medium">Рекомендации (Таблица 2)</label>
+            <textarea
+              {...register("recommendationsTable2")}
+              defaultValue={data?.recommendationsTable2 || ""}
+              rows={3}
+              className="ring-[1.5px] ring-gray-300 p-3 rounded-md text-sm resize-none w-full"
+              placeholder="Рекомендации..."
+            />
+          </div>
+        </div>
       </div>
 
       {/* ТАБЛИЦА 3: В процессе планирования */}
       <div className="bg-yellow-50 p-4 rounded-lg">
-        <h2 className="text-lg font-medium mb-4 text-yellow-800">В процессе планирования учителя параллели</h2>
+        <h2 className="text-lg font-medium mb-4 text-yellow-800">Таблица 3: В процессе планирования</h2>
         <div className="grid grid-cols-1 gap-3">
           {[
             { key: "discussGoalsAlignment", label: "Обсуждают соответствие цели стандартам" },
@@ -378,31 +427,28 @@ const FeedbackForm = ({
             </div>
           ))}
         </div>
-      </div>
-
-      {/* ТАБЛИЦА 4: Текстовые поля */}
-      <div className="bg-purple-50 p-4 rounded-lg">
-        <h2 className="text-lg font-medium mb-4 text-purple-800">Комментарии и рекомендации</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        {/* ✅ Комментарии и рекомендации для Таблицы 3 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
           <div className="flex flex-col gap-2">
-            <label className="text-sm text-gray-700 font-medium">Комментарии</label>
+            <label className="text-sm text-yellow-700 font-medium">Комментарии (Таблица 3)</label>
             <textarea
-              {...register("comments")}
-              defaultValue={data?.comments || ""}
-              rows={6}
+              {...register("commentsTable3")}
+              defaultValue={data?.commentsTable3 || ""}
+              rows={3}
               className="ring-[1.5px] ring-gray-300 p-3 rounded-md text-sm resize-none w-full"
-              placeholder="Ваши комментарии по наблюдению..."
+              placeholder="Комментарии..."
             />
           </div>
           
           <div className="flex flex-col gap-2">
-            <label className="text-sm text-gray-700 font-medium">Рекомендации</label>
+            <label className="text-sm text-yellow-700 font-medium">Рекомендации (Таблица 3)</label>
             <textarea
-              {...register("recommendations")}
-              defaultValue={data?.recommendations || ""}
-              rows={6}
+              {...register("recommendationsTable3")}
+              defaultValue={data?.recommendationsTable3 || ""}
+              rows={3}
               className="ring-[1.5px] ring-gray-300 p-3 rounded-md text-sm resize-none w-full"
-              placeholder="Рекомендации для улучшения..."
+              placeholder="Рекомендации..."
             />
           </div>
         </div>

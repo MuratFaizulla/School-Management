@@ -10,6 +10,18 @@ import { Dispatch, SetStateAction, useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import { useRouter } from "next/navigation";
 
+// ✅ Расписание уроков
+const lessonTimes = [
+ { lesson: 1, start: "08:30", end: "09:15", label: "1-й урок" },
+  { lesson: 2, start: "09:25", end: "10:10", label: "2-й урок" },
+  { lesson: 3, start: "10:20", end: "11:05", label: "3-й урок" },
+  { lesson: 4, start: "11:25", end: "12:10", label: "4-й урок" },
+  { lesson: 5, start: "12:20", end: "13:05", label: "5-й урок" },
+  { lesson: 6, start: "13:25", end: "14:10", label: "6-й урок" },
+  { lesson: 7, start: "14:20", end: "15:05", label: "7-й урок" },
+  { lesson: 8, start: "15:15", end: "16:00", label: "8-й урок" },
+];
+
 const EventForm = ({
   type,
   data,
@@ -22,10 +34,16 @@ const EventForm = ({
   relatedData?: any;
 }) => {
   const router = useRouter();
-  const { teachers, lessons } = relatedData || { teachers: [], lessons: [] };
+  const { teachers, classes } = relatedData || { teachers: [], classes: [] };
 
-  const [useManualTime, setUseManualTime] = useState(false);
-  const [filteredLessons, setFilteredLessons] = useState([]);
+  // ✅ Состояние для выбранных участников
+  const [selectedParticipants, setSelectedParticipants] = useState<string[]>(
+    data?.participants?.map((p: any) => p.teacherId) || []
+  );
+
+  // ✅ Состояние для выбора времени
+  const [selectedLesson, setSelectedLesson] = useState<number | null>(null);
+  const [isCustomTime, setIsCustomTime] = useState(false);
 
   const {
     register,
@@ -36,6 +54,10 @@ const EventForm = ({
     formState: { errors },
   } = useForm<EventSchema>({
     resolver: zodResolver(eventSchema),
+    defaultValues: {
+      teamLeaderId: data?.teamLeaderId || "",
+      classId: data?.classId || undefined,
+    }
   });
 
   const [state, formAction] = useFormState(
@@ -47,9 +69,7 @@ const EventForm = ({
     }
   );
 
-  // Отслеживаем выбранного учителя и урок
-  const selectedTeacherId = watch("teacherId");
-  const selectedLessonId = watch("lessonId");
+  const selectedTeamLeaderId = watch("teamLeaderId");
 
   // ✅ Функция для форматирования времени
   const formatForDateTimeLocal = (date: Date) => {
@@ -62,78 +82,109 @@ const EventForm = ({
     return `${year}-${month}-${day}T${hours}:${minutes}`;
   };
 
-  // ✅ Функция для применения времени урока к выбранной дате
-  const applyLessonTimeToDate = (lessonDateTime: Date, targetDate?: Date) => {
-    const baseDate = targetDate || new Date();
-    const resultDate = new Date(baseDate);
-
-    resultDate.setHours(lessonDateTime.getHours());
-    resultDate.setMinutes(lessonDateTime.getMinutes());
-    resultDate.setSeconds(0);
-    resultDate.setMilliseconds(0);
-
-    return resultDate;
+  // ✅ Функция для получения текущей даты
+  const getCurrentDateTime = () => {
+    const now = new Date();
+    return formatForDateTimeLocal(now);
   };
 
-  // ✅ Исправленная фильтрация уроков по учителю
-  useEffect(() => {
-    if (selectedTeacherId && lessons?.length > 0) {
-      const teacherLessons = lessons.filter(
-        (lesson: any) => lesson.teacherId === selectedTeacherId
-      );
-
-      setFilteredLessons(teacherLessons);
-      // ✅ Используем правильный тип для lessonId
-      setValue("lessonId", undefined as any); // или null
-
-      if (teacherLessons.length === 0) {
-        toast.info("У выбранного учителя пока нет созданных уроков");
+  // ✅ Функция для определения урока по времени
+  const getLessonNumberFromTime = (dateTimeInput: any) => {
+    if (!dateTimeInput) return null;
+    
+    try {
+      const date = new Date(dateTimeInput);
+      
+      if (isNaN(date.getTime())) {
+        return null;
       }
-    } else {
-      setFilteredLessons([]);
-      // ✅ Используем правильный тип для lessonId
-      setValue("lessonId", undefined as any); // или null
+      
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      const timeString = `${hours}:${minutes}`;
+      
+      const lesson = lessonTimes.find(l => l.start === timeString);
+      return lesson ? lesson.lesson : null;
+    } catch (error) {
+      console.log('Error parsing time:', error);
+      return null;
     }
-  }, [selectedTeacherId, lessons, setValue]);
+  };
 
-  // ✅ Простое решение с подавлением TypeScript ошибок
+  // ✅ Инициализация при редактировании
   useEffect(() => {
-    if (selectedLessonId && !useManualTime && filteredLessons.length > 0) {
-      const selectedLesson: any = filteredLessons.find(
-        (lesson: any) => lesson.id == selectedLessonId
-      );
-
-      if (selectedLesson) {
-        const currentStartTime = getValues("startTime");
-        const currentDate = currentStartTime
-          ? new Date(currentStartTime)
-          : new Date();
-
-        // ✅ Используем any для подавления ошибок типизации
-        const lessonStartTime = new Date(selectedLesson.startTime as string);
-        const lessonEndTime = new Date(selectedLesson.endTime as string);
-
-        const newStartTime = applyLessonTimeToDate(
-          lessonStartTime,
-          currentDate
-        );
-        const newEndTime = applyLessonTimeToDate(lessonEndTime, currentDate);
-
-        setValue("startTime", formatForDateTimeLocal(newStartTime) as any);
-        setValue("endTime", formatForDateTimeLocal(newEndTime) as any);
-
-        toast.success(`Время установлено из урока`);
+    if (data && type === "update") {
+      const lessonNum = getLessonNumberFromTime(data.startTime);
+      if (lessonNum) {
+        setSelectedLesson(lessonNum);
+        setIsCustomTime(false);
+      } else {
+        setIsCustomTime(true);
       }
     }
-  }, [selectedLessonId, useManualTime, filteredLessons, setValue, getValues]);
+  }, [data, type]);
+
+  // ✅ Функция для установки времени урока
+  const handleLessonSelect = (lessonNumber: number) => {
+    setSelectedLesson(lessonNumber);
+    setIsCustomTime(false);
+    
+    const lesson = lessonTimes.find(l => l.lesson === lessonNumber);
+    if (lesson) {
+      const existingStartTime = getValues('startTime');
+      const baseDate = existingStartTime ? new Date(existingStartTime) : new Date();
+      
+      const startDateTime = new Date(baseDate);
+      const endDateTime = new Date(baseDate);
+      
+      const [startHour, startMin] = lesson.start.split(':');
+      const [endHour, endMin] = lesson.end.split(':');
+      
+      startDateTime.setHours(parseInt(startHour), parseInt(startMin), 0, 0);
+      endDateTime.setHours(parseInt(endHour), parseInt(endMin), 0, 0);
+      
+      setValue('startTime', formatForDateTimeLocal(startDateTime) as any);
+      setValue('endTime', formatForDateTimeLocal(endDateTime) as any);
+    }
+  };
+
+  // ✅ Обработчик изменения участников
+  const handleParticipantToggle = (teacherId: string) => {
+    setSelectedParticipants((prev) => {
+      if (prev.includes(teacherId)) {
+        return prev.filter((id) => id !== teacherId);
+      } else {
+        return [...prev, teacherId];
+      }
+    });
+  };
+
+  // ✅ Добавить всех участников
+  const handleSelectAll = () => {
+    const allTeacherIds = teachers
+      .filter((t: any) => t.id !== selectedTeamLeaderId)
+      .map((t: any) => t.id);
+    setSelectedParticipants(allTeacherIds);
+  };
+
+  // ✅ Убрать всех участников
+  const handleDeselectAll = () => {
+    setSelectedParticipants([]);
+  };
+
+  // ✅ Обновляем скрытое поле с участниками
+  useEffect(() => {
+    setValue("participants", selectedParticipants);
+  }, [selectedParticipants, setValue]);
+
   const onSubmit = handleSubmit((data) => {
-    console.log(data);
+    console.log("Submitting data:", data);
     formAction(data);
   });
 
   useEffect(() => {
     if (state.success) {
-      toast(`Событие было ${type === "create" ? "создано" : "обновлено"}!`);
+      toast.success(`Событие было ${type === "create" ? "создано" : "обновлено"}!`);
       setOpen(false);
       router.refresh();
     }
@@ -146,6 +197,11 @@ const EventForm = ({
     }
   };
 
+  // ✅ Фильтруем учителей: убираем тим-лидера из списка участников
+  const availableParticipants = teachers.filter(
+    (t: any) => t.id !== selectedTeamLeaderId
+  );
+
   return (
     <div className="max-h-[80vh] overflow-y-auto">
       <form className="flex flex-col gap-6" onSubmit={onSubmit}>
@@ -153,13 +209,17 @@ const EventForm = ({
           {type === "create" ? "Создать новое событие" : "Обновить событие"}
         </h1>
 
+        {/* Скрытый ID */}
+        {data && (
+          <input type="hidden" {...register("id")} value={data?.id} />
+        )}
+
         {/* Основная информация */}
         <div className="bg-gray-50 p-4 rounded-lg">
-          <h2 className=" font-medium text-blue-800 mb-3">
+          <h2 className="font-medium text-blue-800 mb-3">
             Основная информация
           </h2>
           <div className="flex flex-col gap-4">
-            {/* Верх: 2 инпута горизонтально */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <InputField
                 label="Название события"
@@ -178,204 +238,296 @@ const EventForm = ({
               />
             </div>
 
-            {/* Низ: скрытый ID */}
-            {data && (
-              <InputField
-                label="Id"
-                name="id"
-                defaultValue={data?.id}
-                register={register}
-                error={errors?.id}
-                hidden
-              />
-            )}
-          </div>
-        </div>
-
-        {/* Участники события */}
-        <div className="bg-blue-50 p-4 rounded-lg">
-          <h2 className="font-medium text-blue-800 mb-3">Участники события</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="flex flex-col gap-2">
-              <label className="text-xs text-gray-500">Кто контролирует</label>
-              <select
-                className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full"
-                {...register("controllerType")}
-                defaultValue={data?.controllerType || ""}
-              >
-                <option value="">Выберите тип</option>
-                <option value="DIRECTOR">Директор</option>
-                <option value="DEPUTY">Завуч/Заместитель</option>
-                <option value="METHODIST">Методист</option>
-                <option value="INSPECTOR">Инспектор</option>
-                <option value="ADMIN">Администратор</option>
-                <option value="TEACHER">Учитель (взаимопосещение)</option>
-              </select>
-              {errors.controllerType?.message && (
-                <p className="text-xs text-red-400">
-                  {errors.controllerType.message.toString()}
-                </p>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <label className="text-xs text-gray-500">
-                Учитель (кого контролируют)
-              </label>
-              <select
-                className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full"
-                {...register("teacherId")}
-                defaultValue={data?.teacherId || ""}
-              >
-                <option value="">Выберите учителя</option>
-                {teachers?.map(
-                  (teacher: { id: string; name: string; surname: string }) => (
-                    <option value={teacher.id} key={teacher.id}>
-                      {teacher.name} {teacher.surname}
-                    </option>
-                  )
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex flex-col gap-2">
+                <label className="text-xs text-gray-500">Тип контроля</label>
+                <select
+                  className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full"
+                  {...register("controllerType")}
+                  defaultValue={data?.controllerType || ""}
+                >
+                  <option value="">Выберите тип</option>
+                  <option value="DIRECTOR">Директор</option>
+                  <option value="DEPUTY_UC">Заместитель директора по УР</option>
+                  <option value="DEPUTY_VP">Заместитель директора по ВР</option>
+                  <option value="DEPUTY_NMR">Заместитель директора по НМР</option>
+                  <option value="DEPUTY_VS">Заместитель директора по ВС</option>
+                </select>
+                {errors.controllerType?.message && (
+                  <p className="text-xs text-red-400">
+                    {errors.controllerType.message.toString()}
+                  </p>
                 )}
-              </select>
-              {errors.teacherId?.message && (
-                <p className="text-xs text-red-400">
-                  {errors.teacherId.message.toString()}
-                </p>
-              )}
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-xs text-gray-500">Класс</label>
+                <select
+                  className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full"
+                  {...register("classId")}
+                  defaultValue={data?.classId || ""}
+                >
+                  <option value="">Выберите класс</option>
+                  {classes?.map(
+                    (classItem: { id: number; name: string; gradeLevel: number }) => (
+                      <option value={classItem.id} key={classItem.id}>
+                        {classItem.name} ({classItem.gradeLevel} класс)
+                      </option>
+                    )
+                  )}
+                </select>
+                {errors.classId?.message && (
+                  <p className="text-xs text-red-400">
+                    {errors.classId.message.toString()}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Урок для контроля */}
-        <div className="bg-green-50 p-4 rounded-lg">
-          <h2 className="font-medium text-green-800 mb-3">Урок для контроля</h2>
+        {/* Тим-лидер */}
+        <div className="bg-blue-50 p-4 rounded-lg">
+          <h2 className="font-medium text-blue-800 mb-3">Тим-лидер</h2>
           <div className="flex flex-col gap-2">
             <label className="text-xs text-gray-500">
-              Урок (необязательно)
-              {selectedTeacherId && (
-                <span className="text-green-600 ml-1">
-                  - показаны уроки выбранного учителя
-                </span>
-              )}
+              Руководитель группы учителей
             </label>
-
             <select
               className="ring-[1.5px] ring-gray-300 p-2 rounded-md text-sm w-full"
-              {...register("lessonId")}
-              defaultValue={data?.lessonId || ""}
-              disabled={!selectedTeacherId}
+              {...register("teamLeaderId")}
+              defaultValue={data?.teamLeaderId || ""}
             >
-              <option value="">
-                {!selectedTeacherId
-                  ? "Сначала выберите учителя"
-                  : "Не выбран - общий контроль"}
-              </option>
-
-              {filteredLessons?.map((lesson: any) => (
-                <option value={lesson.id} key={lesson.id}>
-                  {lesson.name} - {lesson.class?.name} - {lesson.subject?.name}{" "}
-                  (
-                  {new Date(lesson.startTime).toLocaleString("ru-RU", {
-                    weekday: "short",
-                    month: "short",
-                    day: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}{" "}
-                  -{" "}
-                  {new Date(lesson.endTime).toLocaleTimeString("ru-RU", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                  )
-                </option>
-              ))}
+              <option value="">Выберите тим-лидера</option>
+              {teachers?.map(
+                (teacher: { id: string; name: string; surname: string }) => (
+                  <option value={teacher.id} key={teacher.id}>
+                    {teacher.name} {teacher.surname}
+                  </option>
+                )
+              )}
             </select>
-
-            {errors.lessonId?.message && (
+            {errors.teamLeaderId?.message && (
               <p className="text-xs text-red-400">
-                {errors.lessonId.message.toString()}
+                {errors.teamLeaderId.message.toString()}
               </p>
-            )}
-
-            {selectedTeacherId && (
-              <div className="bg-white p-3 rounded-md border border-green-200 mt-2">
-                <div className="text-sm text-green-700">
-                  📚 Найдено уроков этого учителя:{" "}
-                  <span className="font-medium">{filteredLessons.length}</span>
-                  {filteredLessons.length === 0 && (
-                    <span className="text-yellow-600 ml-2">
-                      (У этого учителя пока нет созданных уроков)
-                    </span>
-                  )}
-                </div>
-              </div>
             )}
           </div>
         </div>
 
-        {/* ✅ Время события */}
-        <div className="bg-purple-50 p-4 rounded-lg">
+        {/* Участники контроля */}
+        <div className="bg-green-50 p-4 rounded-lg">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="font-medium text-purple-800">Время события</h2>
-            {selectedLessonId && (
+            <h2 className="font-medium text-green-800">
+              Участники контроля ({selectedParticipants.length})
+            </h2>
+            <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => setUseManualTime(!useManualTime)}
-                className={`px-3 py-1 text-xs rounded-md transition-colors ${
-                  useManualTime
-                    ? "bg-purple-500 text-white"
-                    : "bg-white text-purple-500 border border-purple-500"
-                }`}
+                onClick={handleSelectAll}
+                className="px-3 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600"
+                disabled={!selectedTeamLeaderId || availableParticipants.length === 0}
               >
-                {useManualTime ? "✏️ Ручной ввод" : "⚡ Время из урока"}
+                Выбрать всех
               </button>
-            )}
+              <button
+                type="button"
+                onClick={handleDeselectAll}
+                className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600"
+                disabled={selectedParticipants.length === 0}
+              >
+                Очистить
+              </button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <InputField
-              label="Время начала"
-              name="startTime"
-              defaultValue={
-                data?.startTime
-                  ? formatForDateTimeLocal(new Date(data.startTime))
-                  : ""
-              }
-              register={register}
-              error={errors?.startTime}
-              type="datetime-local"
-            />
-
-            <InputField
-              label="Время окончания"
-              name="endTime"
-              defaultValue={
-                data?.endTime
-                  ? formatForDateTimeLocal(new Date(data.endTime))
-                  : ""
-              }
-              register={register}
-              error={errors?.endTime}
-              type="datetime-local"
-            />
-          </div>
-
-          {/* ✅ Информационные подсказки */}
-          {!selectedLessonId && (
-            <div className="bg-yellow-100 border border-yellow-300 p-3 rounded-md mt-3">
+          {!selectedTeamLeaderId ? (
+            <div className="bg-yellow-100 border border-yellow-300 p-3 rounded-md">
               <p className="text-xs text-yellow-800">
-                💡 Выберите урок для автоматического заполнения времени или
-                введите время вручную
+                💡 Сначала выберите тим-лидера
               </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-60 overflow-y-auto">
+              {availableParticipants.length === 0 ? (
+                <div className="col-span-2 bg-yellow-100 border border-yellow-300 p-3 rounded-md">
+                  <p className="text-xs text-yellow-800">
+                    Нет доступных участников (все учителя либо являются тим-лидером)
+                  </p>
+                </div>
+              ) : (
+                availableParticipants.map(
+                  (teacher: { id: string; name: string; surname: string }) => (
+                    <label
+                      key={teacher.id}
+                      className={`flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors ${
+                        selectedParticipants.includes(teacher.id)
+                          ? "bg-green-200 border border-green-400"
+                          : "bg-white border border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedParticipants.includes(teacher.id)}
+                        onChange={() => handleParticipantToggle(teacher.id)}
+                        className="w-4 h-4"
+                      />
+                      <span className="text-sm">
+                        {teacher.name} {teacher.surname}
+                      </span>
+                    </label>
+                  )
+                )
+              )}
             </div>
           )}
 
-          {selectedLessonId && !useManualTime && (
-            <div className="bg-blue-100 border border-blue-300 p-3 rounded-md mt-3">
-              <p className="text-xs text-blue-800">
-                ⚡ Время будет автоматически взято из выбранного урока. Дату
-                можете изменить в полях выше.
-              </p>
+          {/* Скрытое поле для participants */}
+          <input
+            type="hidden"
+            {...register("participants")}
+            value={JSON.stringify(selectedParticipants)}
+          />
+
+          {errors.participants?.message && (
+            <p className="text-xs text-red-400 mt-2">
+              {errors.participants.message.toString()}
+            </p>
+          )}
+        </div>
+
+        {/* Время события */}
+        <div className="bg-purple-50 p-4 rounded-lg">
+          <h2 className="font-medium text-purple-800 mb-3">Время события</h2>
+          
+          {/* ✅ Переключатель режимов */}
+          <div className="flex justify-center gap-4 mb-4">
+            <button
+              type="button"
+              onClick={() => {
+                setIsCustomTime(false);
+                setSelectedLesson(null);
+              }}
+              className={`px-4 py-2 rounded-md text-sm transition-colors ${
+                !isCustomTime 
+                  ? 'bg-purple-500 text-white' 
+                  : 'bg-white text-purple-500 border border-purple-500'
+              }`}
+            >
+              📚 Выбрать по расписанию уроков
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setIsCustomTime(true);
+                setSelectedLesson(null);
+              }}
+              className={`px-4 py-2 rounded-md text-sm transition-colors ${
+                isCustomTime 
+                  ? 'bg-purple-500 text-white' 
+                  : 'bg-white text-purple-500 border border-purple-500'
+              }`}
+            >
+              🕒 Указать время вручную
+            </button>
+          </div>
+
+          {!isCustomTime ? (
+            /* ✅ Выбор по номеру урока */
+            <div>
+              <label className="text-sm font-medium text-purple-700 mb-3 block">
+                Выберите номер урока:
+              </label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+                {lessonTimes.map((lesson) => (
+                  <button
+                    key={lesson.lesson}
+                    type="button"
+                    onClick={() => handleLessonSelect(lesson.lesson)}
+                    className={`p-3 rounded-lg border-2 transition-colors ${
+                      selectedLesson === lesson.lesson
+                        ? 'border-purple-500 bg-purple-100 text-purple-800'
+                        : 'border-gray-200 bg-white hover:border-purple-300'
+                    }`}
+                  >
+                    <div className="font-semibold">{lesson.label}</div>
+                    <div className="text-xs text-gray-600">
+                      {lesson.start} - {lesson.end}
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {/* ✅ Скрытые поля времени (заполняются автоматически) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <InputField
+                  label="Время начала"
+                  name="startTime"
+                  defaultValue={
+                    data?.startTime
+                      ? formatForDateTimeLocal(new Date(data.startTime))
+                      : getCurrentDateTime()
+                  }
+                  register={register}
+                  error={errors?.startTime}
+                  type="datetime-local"
+                />
+
+                <InputField
+                  label="Время окончания"
+                  name="endTime"
+                  defaultValue={
+                    data?.endTime
+                      ? formatForDateTimeLocal(new Date(data.endTime))
+                      : ""
+                  }
+                  register={register}
+                  error={errors?.endTime}
+                  type="datetime-local"
+                />
+              </div>
+
+              {selectedLesson && (
+                <div className="bg-white p-3 rounded-md border border-purple-200 mt-3">
+                  <div className="text-sm">
+                    <span className="font-medium text-purple-600">
+                      Выбран: {lessonTimes.find(l => l.lesson === selectedLesson)?.label}
+                    </span>
+                    <span className="ml-2 text-gray-600">
+                      ({lessonTimes.find(l => l.lesson === selectedLesson)?.start} - {lessonTimes.find(l => l.lesson === selectedLesson)?.end})
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* ✅ Ручной ввод времени */
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <InputField
+                label="Время начала"
+                name="startTime"
+                defaultValue={
+                  data?.startTime
+                    ? formatForDateTimeLocal(new Date(data.startTime))
+                    : getCurrentDateTime()
+                }
+                register={register}
+                error={errors?.startTime}
+                type="datetime-local"
+              />
+
+              <InputField
+                label="Время окончания"
+                name="endTime"
+                defaultValue={
+                  data?.endTime
+                    ? formatForDateTimeLocal(new Date(data.endTime))
+                    : ""
+                }
+                register={register}
+                error={errors?.endTime}
+                type="datetime-local"
+              />
             </div>
           )}
         </div>

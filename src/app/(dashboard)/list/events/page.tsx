@@ -4,13 +4,15 @@ import Table from "@/components/Table";
 import TableSearch from "@/components/TableSearch";
 import prisma from "@/lib/prisma";
 import { ITEM_PER_PAGE } from "@/lib/settings";
-import { Event, Prisma, Teacher } from "@prisma/client";
+import { Event, Prisma, Teacher, Class } from "@prisma/client";
 import Image from "next/image";
 import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 
 type EventListType = Event & { 
-  teacher: Teacher;
+  teamLeader: Teacher;
+  class: Class | null;
+  participants: { teacher: Teacher }[];
   feedback?: { id: number } | null;
 };
 
@@ -25,7 +27,9 @@ const EventListPage = async ({
 
   const columns = [
     { header: "Название события", accessor: "title" },
-    { header: "Учитель", accessor: "teacherName" },
+    { header: "Тим-лидер", accessor: "teamLeader" },
+    { header: "Класс", accessor: "class", className: "hidden lg:table-cell" },
+    { header: "Участников", accessor: "participants", className: "hidden xl:table-cell" },
     { header: "Тип контроля", accessor: "controllerType", className: "hidden lg:table-cell" },
     { header: "Дата", accessor: "date", className: "hidden md:table-cell" },
     { header: "Время", accessor: "time", className: "hidden md:table-cell" },
@@ -36,11 +40,10 @@ const EventListPage = async ({
   const translateControllerType = (type: string) => {
     const translations: { [key: string]: string } = {
       DIRECTOR: "Директор",
-      DEPUTY: "Завуч",
-      METHODIST: "Методист",
-      INSPECTOR: "Инспектор",
-      ADMIN: "Админ",
-      TEACHER: "Учитель",
+      DEPUTY_UC: "Завуч УР",
+      DEPUTY_VP: "Завуч ВР",
+      DEPUTY_NMR: "Завуч НМР",
+      DEPUTY_VS: "Завуч ВС",
     };
     return translations[type] || type;
   };
@@ -68,11 +71,22 @@ const EventListPage = async ({
 
       {/* Основная информация */}
       <div className="space-y-2">
-        {/* Учитель */}
+        {/* Тим-лидер */}
         <div className="flex items-center gap-2">
-          <span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600 min-w-fit">Учитель:</span>
+          <span className="text-xs bg-blue-100 px-2 py-1 rounded text-blue-600 min-w-fit">Тим-лидер:</span>
           <span className="text-sm font-medium">
-            {item.teacher ? `${item.teacher.name} ${item.teacher.surname}` : "-"}
+            {item.teamLeader ? `${item.teamLeader.name} ${item.teamLeader.surname}` : "-"}
+          </span>
+        </div>
+
+        {/* Класс и участники */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs bg-green-100 px-2 py-1 rounded text-green-600 min-w-fit">Класс:</span>
+          <span className="text-sm font-medium">
+            {item.class?.name || "-"}
+          </span>
+          <span className="text-xs bg-purple-100 px-2 py-1 rounded text-purple-600 ml-auto">
+            👥 {item.participants.length} участн.
           </span>
         </div>
 
@@ -143,18 +157,51 @@ const EventListPage = async ({
       </td>
       
       <td>
-        {item.teacher ? (
+        {item.teamLeader ? (
           <div className="flex flex-col">
             <span className="font-medium">
-              {item.teacher.name} {item.teacher.surname}
+              {item.teamLeader.name} {item.teamLeader.surname}
             </span>
-            {item.teacher.email && (
-              <span className="text-xs text-gray-500">{item.teacher.email}</span>
+            {item.teamLeader.email && (
+              <span className="text-xs text-gray-500">{item.teamLeader.email}</span>
             )}
           </div>
         ) : (
           <span className="text-gray-400">-</span>
         )}
+      </td>
+
+      <td className="hidden lg:table-cell">
+        {item.class ? (
+          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
+            {item.class.name}
+          </span>
+        ) : (
+          <span className="text-gray-400">-</span>
+        )}
+      </td>
+
+      <td className="hidden xl:table-cell">
+        <div className="flex items-center gap-1">
+          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">
+            👥 {item.participants.length}
+          </span>
+          {item.participants.length > 0 && (
+            <div className="group relative">
+              <button className="text-blue-500 hover:text-blue-700 text-xs">ℹ️</button>
+              <div className="hidden group-hover:block absolute z-10 w-48 p-2 bg-white border border-gray-200 rounded-md shadow-lg right-0 top-6">
+                <div className="text-xs space-y-1">
+                  <div className="font-medium text-gray-700 mb-1">Участники:</div>
+                  {item.participants.map((p) => (
+                    <div key={p.teacher.id} className="text-gray-600">
+                      • {p.teacher.name} {p.teacher.surname}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </td>
 
       <td className="hidden lg:table-cell">
@@ -230,7 +277,7 @@ const EventListPage = async ({
     </tr>
   );
 
-  // Запрос данных (тот же код)...
+  // ✅ Запрос данных с новой структурой
   const { page, ...queryParams } = searchParams;
   const p = page ? parseInt(page) : 1;
 
@@ -244,15 +291,18 @@ const EventListPage = async ({
             query.OR = [
               { title: { contains: value, mode: "insensitive" } },
               { description: { contains: value, mode: "insensitive" } },
-              { teacher: { name: { contains: value, mode: "insensitive" } } },
-              { teacher: { surname: { contains: value, mode: "insensitive" } } },
+              { teamLeader: { name: { contains: value, mode: "insensitive" } } },
+              { teamLeader: { surname: { contains: value, mode: "insensitive" } } },
             ];
             break;
           case "controllerType":
             query.controllerType = value as any;
             break;
-          case "teacherId":
-            query.teacherId = value;
+          case "teamLeaderId":
+            query.teamLeaderId = value;
+            break;
+          case "classId":
+            query.classId = parseInt(value);
             break;
           case "hasFeedback":
             if (value === "true") {
@@ -266,14 +316,17 @@ const EventListPage = async ({
     }
   }
 
+  // ✅ Для учителя: показываем события где он тим-лидер или участник
   if (role === "teacher") {
     query.OR = [
-      { teacherId: currentUserId! },
-      {
-        lesson: {
-          teacherId: currentUserId!,
-        },
-      },
+      { teamLeaderId: currentUserId! }, // Тим-лидер
+      { 
+        participants: { 
+          some: { 
+            teacherId: currentUserId! 
+          } 
+        } 
+      }, // Участник
     ];
   }
 
@@ -281,7 +334,13 @@ const EventListPage = async ({
     prisma.event.findMany({
       where: query,
       include: { 
-        teacher: true,
+        teamLeader: true,
+        class: true,
+        participants: {
+          include: {
+            teacher: true
+          }
+        },
         feedback: { select: { id: true } },
       },
       take: ITEM_PER_PAGE,

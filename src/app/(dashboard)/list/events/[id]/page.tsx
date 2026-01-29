@@ -16,18 +16,29 @@ const SingleEventPage = async ({
   const event = await prisma.event.findUnique({
     where: { id: parseInt(id) },
     include: {
-      lesson: {
+      teamLeader: true,
+      class: true,
+      participants: {
         include: {
-          subject: true,
-          class: true,
+          teacher: true
         }
       },
-      teacher: true,
       feedback: true,
     },
   });
 
   if (!event) return notFound();
+
+  const translateControllerType = (type: string) => {
+    const translations: { [key: string]: string } = {
+      DIRECTOR: "Директор",
+      DEPUTY_UC: "Завуч по УР",
+      DEPUTY_VP: "Завуч по ВР",
+      DEPUTY_NMR: "Завуч по НМР",
+      DEPUTY_VS: "Завуч по ВС",
+    };
+    return translations[type] || type;
+  };
 
   // ✅ Компонент для отображения чекбоксов
   const CheckboxGrid = ({ 
@@ -128,12 +139,13 @@ const SingleEventPage = async ({
                 {event.endTime.toLocaleTimeString("ru-RU", { timeStyle: "short" })}
               </span>
               <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full">
-                👤 {event.controllerType === "DIRECTOR" ? "Директор" :
-                     event.controllerType === "DEPUTY" ? "Завуч" :
-                     event.controllerType === "METHODIST" ? "Методист" :
-                     event.controllerType === "INSPECTOR" ? "Инспектор" :
-                     event.controllerType === "ADMIN" ? "Администратор" : "Учитель"}
+                👤 {translateControllerType(event.controllerType)}
               </span>
+              {event.class && (
+                <span className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 rounded-full">
+                  🎓 {event.class.name}
+                </span>
+              )}
             </div>
           </div>
           {role === "admin" && (
@@ -181,67 +193,85 @@ const SingleEventPage = async ({
             </div>
           </InfoCard>
 
-          {/* Информация об учителе */}
-          {event.teacher && (
-            <InfoCard title="Контролируемый учитель" icon="👨‍🏫">
+          {/* Информация о тим-лидере */}
+          {event.teamLeader && (
+            <InfoCard title="Тим-лидер" icon="👨‍🏫">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <InfoField 
                   label="ФИО" 
-                  value={`${event.teacher.name} ${event.teacher.surname}`}
+                  value={`${event.teamLeader.name} ${event.teamLeader.surname}`}
                 />
-                {event.teacher.email && (
+                {event.teamLeader.email && (
                   <InfoField 
                     label="Email" 
-                    value={event.teacher.email}
+                    value={event.teamLeader.email}
                   />
                 )}
               </div>
               <div className="mt-4 pt-4 border-t border-gray-100">
                 <Link 
-                  href={`/list/teachers/${event.teacher.id}`}
+                  href={`/list/teachers/${event.teamLeader.id}`}
                   className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 transition-colors text-sm font-medium"
                 >
-                  Перейти к профилю учителя →
+                  Перейти к профилю тим-лидера →
                 </Link>
               </div>
             </InfoCard>
           )}
 
-          {/* Информация об уроке */}
-          {event.lesson && (
-            <InfoCard title="Информация об уроке" icon="📚">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <InfoField 
-                  label="Название урока" 
-                  value={event.lesson.name}
-                />
-                <InfoField 
-                  label="Предмет" 
-                  value={event.lesson.subject.name}
-                />
+          {/* Участники контроля */}
+          {event.participants.length > 0 && (
+            <InfoCard title="Участники контроля" icon="👥">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {event.participants.map((participant) => (
+                  <div 
+                    key={participant.id}
+                    className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
+                  >
+                    <span className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-medium text-sm">
+                      {participant.teacher.name[0]}{participant.teacher.surname[0]}
+                    </span>
+                    <div className="flex flex-col">
+                      <span className="font-medium text-sm">
+                        {participant.teacher.name} {participant.teacher.surname}
+                      </span>
+                      {participant.teacher.email && (
+                        <span className="text-xs text-gray-500">{participant.teacher.email}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 pt-4 border-t border-gray-100">
+                <p className="text-sm text-gray-600">
+                  Всего участников: <span className="font-medium">{event.participants.length}</span>
+                </p>
+              </div>
+            </InfoCard>
+          )}
+
+          {/* Информация о классе */}
+          {event.class && (
+            <InfoCard title="Информация о классе" icon="🎓">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <InfoField 
                   label="Класс" 
-                  value={event.lesson.class.name}
+                  value={event.class.name}
                 />
                 <InfoField 
-                  label="День недели" 
-                  value={
-                    event.lesson.day === "MONDAY" ? "Понедельник" :
-                    event.lesson.day === "TUESDAY" ? "Вторник" :
-                    event.lesson.day === "WEDNESDAY" ? "Среда" :
-                    event.lesson.day === "THURSDAY" ? "Четверг" : "Пятница"
-                  }
+                  label="Параллель" 
+                  value={`${event.class.gradeLevel} класс`}
                 />
                 <InfoField 
-                  label="Время урока" 
-                  value={`${event.lesson.startTime.toLocaleTimeString("ru-RU", { 
-                    hour: '2-digit', 
-                    minute: '2-digit'
-                  })} - ${event.lesson.endTime.toLocaleTimeString("ru-RU", { 
-                    hour: '2-digit', 
-                    minute: '2-digit'
-                  })}`}
+                  label="Вместимость" 
+                  value={`${event.class.capacity} учеников`}
                 />
+                {event.class.supervisorId && (
+                  <InfoField 
+                    label="Классный руководитель" 
+                    value="Есть"
+                  />
+                )}
               </div>
             </InfoCard>
           )}
@@ -310,13 +340,19 @@ const SingleEventPage = async ({
                 </span>
               </div>
               <div className="flex items-center justify-between py-2 border-b border-gray-100">
-                <span className="text-sm text-gray-600">Урок привязан</span>
+                <span className="text-sm text-gray-600">Участников</span>
+                <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                  {event.participants.length}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                <span className="text-sm text-gray-600">Класс привязан</span>
                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  event.lesson 
+                  event.class 
                     ? 'bg-blue-100 text-blue-700' 
                     : 'bg-gray-100 text-gray-700'
                 }`}>
-                  {event.lesson ? 'Да' : 'Нет'}
+                  {event.class ? 'Да' : 'Нет'}
                 </span>
               </div>
               {event.feedback && (
@@ -371,16 +407,12 @@ const SingleEventPage = async ({
                 label="Параллель" 
                 value={event.feedback.grade}
               />
-              <InfoField 
-                label="Количество учителей" 
-                value={event.feedback.presentTeachersCount}
-              />
             </div>
           </div>
 
-          {/* Чекбоксы */}
+          {/* Таблица 1: Чекбоксы */}
           <CheckboxGrid
-            title="Вопросы для наблюдения"
+            title="Таблица 1: Вопросы для наблюдения"
             colorClass="blue"
             feedback={event.feedback}
             items={[
@@ -394,8 +426,34 @@ const SingleEventPage = async ({
             ]}
           />
 
+          {/* Комментарии и рекомендации Таблица 1 */}
+          {(event.feedback.commentsTable1 || event.feedback.recommendationsTable1) && (
+            <div className="mb-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {event.feedback.commentsTable1 && (
+                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <h4 className="font-medium text-blue-700 mb-2 text-sm">Комментарии (Таблица 1)</h4>
+                    <p className="text-blue-600 text-sm leading-relaxed whitespace-pre-wrap">
+                      {event.feedback.commentsTable1}
+                    </p>
+                  </div>
+                )}
+                
+                {event.feedback.recommendationsTable1 && (
+                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <h4 className="font-medium text-blue-700 mb-2 text-sm">Рекомендации (Таблица 1)</h4>
+                    <p className="text-blue-600 text-sm leading-relaxed whitespace-pre-wrap">
+                      {event.feedback.recommendationsTable1}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Таблица 2: Чекбоксы */}
           <CheckboxGrid
-            title="Исходные данные при планировании"
+            title="Таблица 2: Исходные данные при планировании"
             colorClass="green"
             feedback={event.feedback}
             items={[
@@ -416,8 +474,34 @@ const SingleEventPage = async ({
             </div>
           )}
 
+          {/* Комментарии и рекомендации Таблица 2 */}
+          {(event.feedback.commentsTable2 || event.feedback.recommendationsTable2) && (
+            <div className="mb-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {event.feedback.commentsTable2 && (
+                  <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                    <h4 className="font-medium text-green-700 mb-2 text-sm">Комментарии (Таблица 2)</h4>
+                    <p className="text-green-600 text-sm leading-relaxed whitespace-pre-wrap">
+                      {event.feedback.commentsTable2}
+                    </p>
+                  </div>
+                )}
+                
+                {event.feedback.recommendationsTable2 && (
+                  <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                    <h4 className="font-medium text-green-700 mb-2 text-sm">Рекомендации (Таблица 2)</h4>
+                    <p className="text-green-600 text-sm leading-relaxed whitespace-pre-wrap">
+                      {event.feedback.recommendationsTable2}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Таблица 3: Чекбоксы */}
           <CheckboxGrid
-            title="В процессе планирования учителя параллели"
+            title="Таблица 3: В процессе планирования"
             colorClass="yellow"
             feedback={event.feedback}
             items={[
@@ -436,32 +520,30 @@ const SingleEventPage = async ({
             ]}
           />
 
-          {/* Комментарии и рекомендации */}
-          <div className="mb-6">
-            <h3 className="font-medium text-purple-800 mb-4 flex items-center gap-2">
-              <span className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 text-sm">💬</span>
-              Комментарии и рекомендации
-            </h3>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {event.feedback.comments && (
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <h4 className="font-medium text-gray-700 mb-2">Комментарии</h4>
-                  <p className="text-gray-600 text-sm leading-relaxed whitespace-pre-wrap">
-                    {event.feedback.comments}
-                  </p>
-                </div>
-              )}
-              
-              {event.feedback.recommendations && (
-                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <h4 className="font-medium text-blue-700 mb-2">Рекомендации</h4>
-                  <p className="text-blue-600 text-sm leading-relaxed whitespace-pre-wrap">
-                    {event.feedback.recommendations}
-                  </p>
-                </div>
-              )}
+          {/* Комментарии и рекомендации Таблица 3 */}
+          {(event.feedback.commentsTable3 || event.feedback.recommendationsTable3) && (
+            <div className="mb-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {event.feedback.commentsTable3 && (
+                  <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                    <h4 className="font-medium text-yellow-700 mb-2 text-sm">Комментарии (Таблица 3)</h4>
+                    <p className="text-yellow-600 text-sm leading-relaxed whitespace-pre-wrap">
+                      {event.feedback.commentsTable3}
+                    </p>
+                  </div>
+                )}
+                
+                {event.feedback.recommendationsTable3 && (
+                  <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                    <h4 className="font-medium text-yellow-700 mb-2 text-sm">Рекомендации (Таблица 3)</h4>
+                    <p className="text-yellow-600 text-sm leading-relaxed whitespace-pre-wrap">
+                      {event.feedback.recommendationsTable3}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
           
           <div className="text-xs text-gray-400 border-t pt-4">
             Лист наблюдения создан: {event.feedback.createdAt.toLocaleString("ru-RU", {
