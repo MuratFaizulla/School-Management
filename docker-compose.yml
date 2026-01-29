@@ -1,25 +1,53 @@
+# version: '3.8'
+
+# services:
+#   postgress:
+#     image: postgres:15
+#     container_name: postgres_db
+#     environment:
+#       POSTGRES_USER: admin
+#       POSTGRES_PASSWORD: Admin12345
+#       POSTGRES_DB: school
+#     ports:
+#       - '5432:5432'
+#     volumes:
+#       - postgres_data:/var/lib/postgresql/data
+    
+#   app:
+#     build: .
+#     container_name: nextjs_app
+#     ports:
+#       - '3000:3000'
+#     environment:
+#       - DATABASE_URL: postgresql://admin:Admin12345@postgres_db:5432/school
+#     depends_on:
+#       - postgres
+
+# volumes:
+#   postgres_data:
+
 version: '3.8'
 
 services:
-  postgress:
-    image: postgres:15
+  postgres:
+    image: postgres:latest
     container_name: postgres_db
     environment:
-      POSTGRES_USER: myuser
-      POSTGRES_PASSWORD: mypassword
-      POSTGRES_DB: mydb
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: Admin12345
+      POSTGRES_DB: school
     ports:
-      - '5432:5432'
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    
+
   app:
     build: .
     container_name: nextjs_app
     ports:
-      - '3000:3000'
+      - "3000:3000"
     environment:
-      - DATABASE_URL: postgresql://myuser:mypassword@[YOUR_SERVER_IP]:5432/mydb
+      DATABASE_URL: postgresql://admin:Admin12345@postgres:5432/school
     depends_on:
       - postgres
 
