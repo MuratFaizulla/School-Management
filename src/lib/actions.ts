@@ -148,7 +148,10 @@ export const deleteSubject = async (
   }
 };
 
+// ==============================================
 // CLASS ACTIONS
+// ==============================================
+
 export const createClass = async (
   currentState: CurrentState,
   data: ClassSchema
@@ -157,8 +160,6 @@ export const createClass = async (
     await prisma.class.create({
       data: {
         name: data.name,
-        gradeLevel: data.gradeLevel,
-        capacity: data.capacity,
         supervisorId: data.supervisorId || null,
       },
     });
@@ -206,8 +207,6 @@ export const updateClass = async (
       },
       data: {
         name: data.name,
-        gradeLevel: data.gradeLevel,
-        capacity: data.capacity,
         supervisorId: data.supervisorId || null,
       },
     });
@@ -287,181 +286,6 @@ export const deleteClass = async (
     };
   }
 };
-
-
-// TEACHER ACTIONS
-
-// export const createTeacher = async (
-//   currentState: CurrentState,
-//   data: TeacherSchema
-// ) => {
-//   try {
-//     const user = await clerkClient.users.createUser({
-//       username: data.username,
-//       password: data.password,
-//       firstName: data.name,
-//       lastName: data.surname,
-//       publicMetadata: { role: "teacher" }
-//     });
-
-//     await prisma.teacher.create({
-//       data: {
-//         id: user.id,
-//         username: data.username,
-//         name: data.name,
-//         surname: data.surname,
-//         email: data.email || null,
-//         // ❌ Убрали: phone, address, img, bloodType, sex, birthday
-//         subjects: {
-//           connect: data.subjects?.map((subjectId: string) => ({
-//             id: parseInt(subjectId),
-//           })),
-//         },
-//       },
-//     });
-
-//     return { success: true, error: false };
-//   } catch (err: any) {
-//     console.log(err);
-    
-//     if (err.message?.includes('username')) {
-//       return { 
-//         success: false, 
-//         error: true, 
-//         message: "Пользователь с таким логином уже существует!" 
-//       };
-//     }
-    
-//     if (err.message?.includes('email')) {
-//       return { 
-//         success: false, 
-//         error: true, 
-//         message: "Пользователь с таким email уже существует!" 
-//       };
-//     }
-    
-//     if (err.code === 'P2002') {
-//       return { 
-//         success: false, 
-//         error: true, 
-//         message: "Учитель с такими данными уже существует!" 
-//       };
-//     }
-    
-//     return { 
-//       success: false, 
-//       error: true, 
-//       message: `Ошибка создания учителя: ${err.message}` 
-//     };
-//   }
-// };
-
-// export const updateTeacher = async (
-//   currentState: CurrentState,
-//   data: TeacherSchema
-// ) => {
-//   if (!data.id) {
-//     return { success: false, error: true, message: "ID учителя не указан!" };
-//   }
-  
-//   try {
-//     const user = await clerkClient.users.updateUser(data.id, {
-//       username: data.username,
-//       ...(data.password !== "" && { password: data.password }),
-//       firstName: data.name,
-//       lastName: data.surname,
-//     });
-
-//     await prisma.teacher.update({
-//       where: {
-//         id: data.id,
-//       },
-//       data: {
-//         username: data.username,
-//         name: data.name,
-//         surname: data.surname,
-//         email: data.email || null,
-//         // ❌ Убрали: password, phone, address, img, bloodType, sex, birthday
-//         subjects: {
-//           set: data.subjects?.map((subjectId: string) => ({
-//             id: parseInt(subjectId),
-//           })),
-//         },
-//       },
-//     });
-    
-//     return { success: true, error: false };
-//   } catch (err: any) {
-//     console.log(err);
-    
-//     if (err.code === 'P2025') {
-//       return { 
-//         success: false, 
-//         error: true, 
-//         message: "Учитель не найден!" 
-//       };
-//     }
-    
-//     if (err.code === 'P2002') {
-//       return { 
-//         success: false, 
-//         error: true, 
-//         message: "Такой логин или email уже существует!" 
-//       };
-//     }
-    
-//     return { 
-//       success: false, 
-//       error: true, 
-//       message: `Ошибка обновления: ${err.message}` 
-//     };
-//   }
-// };
-
-// export const deleteTeacher = async (
-//   currentState: CurrentState,
-//   data: FormData
-// ) => {
-//   const id = data.get("id") as string;
-//   try {
-//     await clerkClient.users.deleteUser(id);
-
-//     await prisma.teacher.delete({
-//       where: {
-//         id: id,
-//       },
-//     });
-
-//     return { success: true, error: false };
-//   } catch (err: any) {
-//     console.log(err);
-    
-//     if (err.code === 'P2025') {
-//       return { 
-//         success: false, 
-//         error: true, 
-//         message: "Учитель не найден!" 
-//       };
-//     }
-    
-//     if (err.code === 'P2003') {
-//       return { 
-//         success: false, 
-//         error: true, 
-//         message: "Нельзя удалить учителя, у которого есть уроки или классы!" 
-//       };
-//     }
-    
-//     return { 
-//       success: false, 
-//       error: true, 
-//       message: `Ошибка удаления: ${err.message}` 
-//     };
-//   }
-// };
-
-
-
 
 // LESSON ACTIONS
 
@@ -620,364 +444,176 @@ export const deleteLesson = async (
 };
 
 
+// ==============================================
+// TEACHER ACTIONS
+// ==============================================
 
-// EVENT ACTIONS
-// export const createEvent = async (
-//   currentState: CurrentState,
-//   data: EventSchema
-// ) => {
-//   try {
-//     await prisma.event.create({
-//       data: {
-//         title: data.title,
-//         description: data.description,
-//         startTime: data.startTime,
-//         endTime: data.endTime,
-//         controllerType: data.controllerType,
-//         teacherId: data.teacherId,
-//         lessonId: data.lessonId || null,
-//         // ❌ Убрали controllerId и classId
-//       },
-//     });
+export const createTeacher = async (
+  currentState: CurrentState,
+  data: TeacherSchema
+) => {
+  try {
+    const user = await clerkClient.users.createUser({
+      username: data.username,
+      password: data.password,
+      firstName: data.name,
+      lastName: data.surname,
+      publicMetadata: { role: "teacher" }
+    });
 
-//     return { success: true, error: false };
-//   } catch (err: any) {
-//     console.log(err);
+    await prisma.teacher.create({
+      data: {
+        id: user.id,
+        username: data.username,
+        name: data.name,
+        surname: data.surname,
+        email: data.email || null,
+        subjects: {
+          connect: data.subjects?.map((subjectId: string) => ({
+            id: parseInt(subjectId),
+          })),
+        },
+      },
+    });
+
+    return { success: true, error: false };
+  } catch (err: any) {
+    console.log(err);
     
-//     if (err.code === 'P2003') {
-//       if (err.meta?.field_name?.includes('teacherId')) {
-//         return {
-//           success: false,
-//           error: true,
-//           message: "Выбранный учитель не найден!"
-//         };
-//       }
-//       if (err.meta?.field_name?.includes('lessonId')) {
-//         return {
-//           success: false,
-//           error: true,
-//           message: "Выбранный урок не найден!"
-//         };
-//       }
-//       // ❌ Убрали обработку controllerId и classId
-//     }
+    if (err.message?.includes('username')) {
+      return { 
+        success: false, 
+        error: true, 
+        message: "Пользователь с таким логином уже существует!" 
+      };
+    }
     
-//     return {
-//       success: false,
-//       error: true,
-//       message: `Ошибка создания события: ${err.message}`
-//     };
-//   }
-// };
+    if (err.message?.includes('email')) {
+      return { 
+        success: false, 
+        error: true, 
+        message: "Пользователь с таким email уже существует!" 
+      };
+    }
+    
+    if (err.code === 'P2002') {
+      return { 
+        success: false, 
+        error: true, 
+        message: "Учитель с такими данными уже существует!" 
+      };
+    }
+    
+    return { 
+      success: false, 
+      error: true, 
+      message: `Ошибка создания учителя: ${err.message}` 
+    };
+  }
+};
 
-// export const updateEvent = async (
-//   currentState: CurrentState,
-//   data: EventSchema
-// ) => {
-//   if (!data.id) {
-//     return { success: false, error: true, message: "ID события не указан!" };
-//   }
+export const updateTeacher = async (
+  currentState: CurrentState,
+  data: TeacherSchema
+) => {
+  if (!data.id) {
+    return { success: false, error: true, message: "ID учителя не указан!" };
+  }
   
-//   try {
-//     await prisma.event.update({
-//       where: {
-//         id: data.id,
-//       },
-//       data: {
-//         title: data.title,
-//         description: data.description,
-//         startTime: data.startTime,
-//         endTime: data.endTime,
-//         controllerType: data.controllerType,
-//         teacherId: data.teacherId,
-//         lessonId: data.lessonId || null,
-//         // ❌ Убрали controllerId и classId
-//       },
-//     });
+  try {
+    const user = await clerkClient.users.updateUser(data.id, {
+      username: data.username,
+      ...(data.password !== "" && { password: data.password }),
+      firstName: data.name,
+      lastName: data.surname,
+    });
 
-//     return { success: true, error: false };
-//   } catch (err: any) {
-//     console.log(err);
+    await prisma.teacher.update({
+      where: {
+        id: data.id,
+      },
+      data: {
+        username: data.username,
+        name: data.name,
+        surname: data.surname,
+        email: data.email || null,
+        subjects: {
+          set: data.subjects?.map((subjectId: string) => ({
+            id: parseInt(subjectId),
+          })),
+        },
+      },
+    });
     
-//     if (err.code === 'P2025') {
-//       return {
-//         success: false,
-//         error: true,
-//         message: "Событие не найдено!"
-//       };
-//     }
+    return { success: true, error: false };
+  } catch (err: any) {
+    console.log(err);
     
-//     if (err.code === 'P2003') {
-//       return {
-//         success: false,
-//         error: true,
-//         message: "Ошибка связи: проверьте выбранного учителя или урок!"
-//       };
-//     }
+    if (err.code === 'P2025') {
+      return { 
+        success: false, 
+        error: true, 
+        message: "Учитель не найден!" 
+      };
+    }
     
-//     return {
-//       success: false,
-//       error: true,
-//       message: `Ошибка обновления события: ${err.message}`
-//     };
-//   }
-// };
-
-// export const deleteEvent = async (
-//   currentState: CurrentState,
-//   data: FormData
-// ) => {
-//   const id = data.get("id") as string;
-
-//   try {
-//     await prisma.event.delete({
-//       where: {
-//         id: parseInt(id),
-//       },
-//     });
-
-//     return { success: true, error: false };
-//   } catch (err: any) {
-//     console.log(err);
+    if (err.code === 'P2002') {
+      return { 
+        success: false, 
+        error: true, 
+        message: "Такой логин или email уже существует!" 
+      };
+    }
     
-//     if (err.code === 'P2025') {
-//       return {
-//         success: false,
-//         error: true,
-//         message: "Событие не найдено!"
-//       };
-//     }
+    return { 
+      success: false, 
+      error: true, 
+      message: `Ошибка обновления: ${err.message}` 
+    };
+  }
+};
+
+export const deleteTeacher = async (
+  currentState: CurrentState,
+  data: FormData
+) => {
+  const id = data.get("id") as string;
+  try {
+    await clerkClient.users.deleteUser(id);
+
+    await prisma.teacher.delete({
+      where: {
+        id: id,
+      },
+    });
+
+    return { success: true, error: false };
+  } catch (err: any) {
+    console.log(err);
     
-//     if (err.code === 'P2003') {
-//       return {
-//         success: false,
-//         error: true,
-//         message: "Нельзя удалить событие, для которого есть обратная связь!"
-//       };
-//     }
+    if (err.code === 'P2025') {
+      return { 
+        success: false, 
+        error: true, 
+        message: "Учитель не найден!" 
+      };
+    }
     
-//     return {
-//       success: false,
-//       error: true,
-//       message: `Ошибка удаления события: ${err.message}`
-//     };
-//   }
-// };
-
-
-
-
-
-
-
-
-// FEEDBACK ACTIONS
-
-// export const createFeedback = async (
-//   currentState: CurrentState,
-//   data: FeedbackSchema
-// ) => {
-//   try {
-//     await prisma.feedback.create({
-//       data: {
-//         observerName: data.observerName,
-//         observationDate: data.observationDate,
-//         observationTime: data.observationTime,
-//         subject: data.subject,
-//         grade: data.grade,
-//         presentTeachersCount: data.presentTeachersCount,
-        
-//         // Таблица 1
-//         hasTeamLeader: data.hasTeamLeader,
-//         hasAgenda: data.hasAgenda,
-//         isProcessDocumented: data.isProcessDocumented,
-//         teachersShowInterest: data.teachersShowInterest,
-//         teachersGiveSuggestions: data.teachersGiveSuggestions,
-//         effectiveCollaboration: data.effectiveCollaboration,
-//         analyzePreviousLessons: data.analyzePreviousLessons,
-        
-//         // Таблица 2
-//         useLessonReflection: data.useLessonReflection,
-//         useStudentAchievements: data.useStudentAchievements,
-//         useExternalAssessment: data.useExternalAssessment,
-//         usePedagogicalDecisions: data.usePedagogicalDecisions,
-//         useLessonVisitResults: data.useLessonVisitResults,
-//         useStudentFeedback: data.useStudentFeedback,
-//         useOtherData: data.useOtherData,
-//         otherDataDescription: data.otherDataDescription || null,
-        
-//         // Таблица 3
-//         discussGoalsAlignment: data.discussGoalsAlignment,
-//         adaptLearningGoals: data.adaptLearningGoals,
-//         selectAppropriateResources: data.selectAppropriateResources,
-//         selectDifferentiatedStrategies: data.selectDifferentiatedStrategies,
-//         selectEngagingTasks: data.selectEngagingTasks,
-//         discussDescriptors: data.discussDescriptors,
-//         allocateTime: data.allocateTime,
-//         selectFormativeAssessment: data.selectFormativeAssessment,
-//         planReflection: data.planReflection,
-//         useICTTools: data.useICTTools,
-//         defineHomework: data.defineHomework,
-//         considerSafety: data.considerSafety,
-        
-//         // Текстовые поля
-//         comments: data.comments || null,
-//         recommendations: data.recommendations || null,
-        
-//         // Связь с событием
-//         eventId: data.eventId,
-//       },
-//     });
-
-//     return { success: true, error: false };
-//   } catch (err: any) {
-//     console.log(err);
+    if (err.code === 'P2003') {
+      return { 
+        success: false, 
+        error: true, 
+        message: "Нельзя удалить учителя, у которого есть уроки или классы!" 
+      };
+    }
     
-//     if (err.code === 'P2003') {
-//       return {
-//         success: false,
-//         error: true,
-//         message: "Выбранное событие не найдено!"
-//       };
-//     }
-    
-//     if (err.code === 'P2002') {
-//       return {
-//         success: false,
-//         error: true,
-//         message: "Обратная связь для этого события уже существует!"
-//       };
-//     }
-    
-//     return {
-//       success: false,
-//       error: true,
-//       message: `Ошибка создания обратной связи: ${err.message}`
-//     };
-//   }
-// };
-
-// export const updateFeedback = async (
-//   currentState: CurrentState,
-//   data: FeedbackSchema
-// ) => {
-//   if (!data.id) {
-//     return { success: false, error: true, message: "ID обратной связи не указан!" };
-//   }
-  
-//   try {
-//     await prisma.feedback.update({
-//       where: { id: data.id },
-//       data: {
-//         observerName: data.observerName,
-//         observationDate: data.observationDate,
-//         observationTime: data.observationTime,
-//         subject: data.subject,
-//         grade: data.grade,
-//         presentTeachersCount: data.presentTeachersCount,
-        
-//         // ТАБЛИЦА 1
-//         hasTeamLeader: data.hasTeamLeader,
-//         hasAgenda: data.hasAgenda,
-//         isProcessDocumented: data.isProcessDocumented,
-//         teachersShowInterest: data.teachersShowInterest,
-//         teachersGiveSuggestions: data.teachersGiveSuggestions,
-//         effectiveCollaboration: data.effectiveCollaboration,
-//         analyzePreviousLessons: data.analyzePreviousLessons,
-        
-//         // ТАБЛИЦА 2
-//         useLessonReflection: data.useLessonReflection,
-//         useStudentAchievements: data.useStudentAchievements,
-//         useExternalAssessment: data.useExternalAssessment,
-//         usePedagogicalDecisions: data.usePedagogicalDecisions,
-//         useLessonVisitResults: data.useLessonVisitResults,
-//         useStudentFeedback: data.useStudentFeedback,
-//         useOtherData: data.useOtherData,
-//         otherDataDescription: data.otherDataDescription || null,
-        
-//         // ТАБЛИЦА 3
-//         discussGoalsAlignment: data.discussGoalsAlignment,
-//         adaptLearningGoals: data.adaptLearningGoals,
-//         selectAppropriateResources: data.selectAppropriateResources,
-//         selectDifferentiatedStrategies: data.selectDifferentiatedStrategies,
-//         selectEngagingTasks: data.selectEngagingTasks,
-//         discussDescriptors: data.discussDescriptors,
-//         allocateTime: data.allocateTime,
-//         selectFormativeAssessment: data.selectFormativeAssessment,
-//         planReflection: data.planReflection,
-//         useICTTools: data.useICTTools,
-//         defineHomework: data.defineHomework,
-//         considerSafety: data.considerSafety,
-        
-//         // ТАБЛИЦА 4
-//         comments: data.comments || null,
-//         recommendations: data.recommendations || null,
-        
-//         // ❌ УБРАЛИ eventId - он не должен обновляться!
-//         // eventId: data.eventId, // <-- ЭТА СТРОКА ВЫЗЫВАЛА ОШИБКУ
-//       },
-//     });
-
-//     return { success: true, error: false };
-//   } catch (err: any) {
-//     console.log(err);
-    
-//     if (err.code === 'P2025') {
-//       return {
-//         success: false,
-//         error: true,
-//         message: "Обратная связь не найдена!"
-//       };
-//     }
-    
-//     if (err.code === 'P2003') {
-//       return {
-//         success: false,
-//         error: true,
-//         message: "Ошибка связи с событием!"
-//       };
-//     }
-    
-//     return {
-//       success: false,
-//       error: true,
-//       message: `Ошибка обновления обратной связи: ${err.message}`
-//     };
-//   }
-// };
-// export const deleteFeedback = async (
-//   currentState: CurrentState,
-//   data: FormData
-// ) => {
-//   const id = data.get("id") as string;
-
-//   try {
-//     await prisma.feedback.delete({
-//       where: { id: parseInt(id) },
-//     });
-
-//     return { success: true, error: false };
-//   } catch (err: any) {
-//     console.log(err);
-    
-//     if (err.code === 'P2025') {
-//       return {
-//         success: false,
-//         error: true,
-//         message: "Обратная связь не найдена!"
-//       };
-//     }
-    
-//     return {
-//       success: false,
-//       error: true,
-//       message: `Ошибка удаления обратной связи: ${err.message}`
-//     };
-//   }
-// };
-
-
-
+    return { 
+      success: false, 
+      error: true, 
+      message: `Ошибка удаления: ${err.message}` 
+    };
+  }
+};
 
 
 // ==============================================
@@ -1159,8 +795,7 @@ export const createFeedback = async (
         observerName: data.observerName,
         observationDate: data.observationDate,
         observationTime: data.observationTime,
-        subject: data.subject,
-        grade: data.grade,
+  
         
         // Таблица 1
         hasTeamLeader: data.hasTeamLeader,
@@ -1249,8 +884,7 @@ export const updateFeedback = async (
         observerName: data.observerName,
         observationDate: data.observationDate,
         observationTime: data.observationTime,
-        subject: data.subject,
-        grade: data.grade,
+    
         
         // ТАБЛИЦА 1
         hasTeamLeader: data.hasTeamLeader,
@@ -1346,173 +980,3 @@ export const deleteFeedback = async (
   }
 };
 
-// ==============================================
-// TEACHER ACTIONS
-// ==============================================
-
-export const createTeacher = async (
-  currentState: CurrentState,
-  data: TeacherSchema
-) => {
-  try {
-    const user = await clerkClient.users.createUser({
-      username: data.username,
-      password: data.password,
-      firstName: data.name,
-      lastName: data.surname,
-      publicMetadata: { role: "teacher" }
-    });
-
-    await prisma.teacher.create({
-      data: {
-        id: user.id,
-        username: data.username,
-        name: data.name,
-        surname: data.surname,
-        email: data.email || null,
-        subjects: {
-          connect: data.subjects?.map((subjectId: string) => ({
-            id: parseInt(subjectId),
-          })),
-        },
-      },
-    });
-
-    return { success: true, error: false };
-  } catch (err: any) {
-    console.log(err);
-    
-    if (err.message?.includes('username')) {
-      return { 
-        success: false, 
-        error: true, 
-        message: "Пользователь с таким логином уже существует!" 
-      };
-    }
-    
-    if (err.message?.includes('email')) {
-      return { 
-        success: false, 
-        error: true, 
-        message: "Пользователь с таким email уже существует!" 
-      };
-    }
-    
-    if (err.code === 'P2002') {
-      return { 
-        success: false, 
-        error: true, 
-        message: "Учитель с такими данными уже существует!" 
-      };
-    }
-    
-    return { 
-      success: false, 
-      error: true, 
-      message: `Ошибка создания учителя: ${err.message}` 
-    };
-  }
-};
-
-export const updateTeacher = async (
-  currentState: CurrentState,
-  data: TeacherSchema
-) => {
-  if (!data.id) {
-    return { success: false, error: true, message: "ID учителя не указан!" };
-  }
-  
-  try {
-    const user = await clerkClient.users.updateUser(data.id, {
-      username: data.username,
-      ...(data.password !== "" && { password: data.password }),
-      firstName: data.name,
-      lastName: data.surname,
-    });
-
-    await prisma.teacher.update({
-      where: {
-        id: data.id,
-      },
-      data: {
-        username: data.username,
-        name: data.name,
-        surname: data.surname,
-        email: data.email || null,
-        subjects: {
-          set: data.subjects?.map((subjectId: string) => ({
-            id: parseInt(subjectId),
-          })),
-        },
-      },
-    });
-    
-    return { success: true, error: false };
-  } catch (err: any) {
-    console.log(err);
-    
-    if (err.code === 'P2025') {
-      return { 
-        success: false, 
-        error: true, 
-        message: "Учитель не найден!" 
-      };
-    }
-    
-    if (err.code === 'P2002') {
-      return { 
-        success: false, 
-        error: true, 
-        message: "Такой логин или email уже существует!" 
-      };
-    }
-    
-    return { 
-      success: false, 
-      error: true, 
-      message: `Ошибка обновления: ${err.message}` 
-    };
-  }
-};
-
-export const deleteTeacher = async (
-  currentState: CurrentState,
-  data: FormData
-) => {
-  const id = data.get("id") as string;
-  try {
-    await clerkClient.users.deleteUser(id);
-
-    await prisma.teacher.delete({
-      where: {
-        id: id,
-      },
-    });
-
-    return { success: true, error: false };
-  } catch (err: any) {
-    console.log(err);
-    
-    if (err.code === 'P2025') {
-      return { 
-        success: false, 
-        error: true, 
-        message: "Учитель не найден!" 
-      };
-    }
-    
-    if (err.code === 'P2003') {
-      return { 
-        success: false, 
-        error: true, 
-        message: "Нельзя удалить учителя, у которого есть уроки или классы!" 
-      };
-    }
-    
-    return { 
-      success: false, 
-      error: true, 
-      message: `Ошибка удаления: ${err.message}` 
-    };
-  }
-};

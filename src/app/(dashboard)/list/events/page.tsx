@@ -283,6 +283,11 @@ const EventListPage = async ({
 
   const query: Prisma.EventWhereInput = {};
 
+  // ✅ Если роль = teacher, показываем только события где он тим-лидер
+  if (role === "teacher" && currentUserId) {
+    query.teamLeaderId = currentUserId;
+  }
+
   if (queryParams) {
     for (const [key, value] of Object.entries(queryParams)) {
       if (value && value !== "") {
@@ -316,18 +321,9 @@ const EventListPage = async ({
     }
   }
 
-  // ✅ Для учителя: показываем события где он тим-лидер или участник
-  if (role === "teacher") {
-    query.OR = [
-      { teamLeaderId: currentUserId! }, // Тим-лидер
-      { 
-        participants: { 
-          some: { 
-            teacherId: currentUserId! 
-          } 
-        } 
-      }, // Участник
-    ];
+  // ✅ Для учителя: показываем только события где он тим-лидер
+  if (role === "teacher" && currentUserId) {
+    query.teamLeaderId = currentUserId;
   }
 
   const [data, count] = await prisma.$transaction([

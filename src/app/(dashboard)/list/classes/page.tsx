@@ -24,16 +24,6 @@ const ClassListPage = async ({
       accessor: "name",
     },
     {
-      header: "Вместимость",
-      accessor: "capacity",
-      className: "hidden md:table-cell",
-    },
-    {
-      header: "Параллель",
-      accessor: "gradeLevel",
-      className: "hidden md:table-cell",
-    },
-    {
       header: "Куратор",
       accessor: "supervisor",
       className: "hidden md:table-cell",
@@ -54,12 +44,6 @@ const ClassListPage = async ({
       className="border-b border-gray-200 even:bg-slate-50 text-sm hover:bg-lamaPurpleLight"
     >
       <td className="flex items-center gap-4 p-4 font-medium">{item.name}</td>
-      <td className="hidden md:table-cell">{item.capacity} чел.</td>
-      <td className="hidden md:table-cell">
-        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-          {item.gradeLevel} класс
-        </span>
-      </td>
       <td className="hidden md:table-cell">
         {item.supervisor
           ? `${item.supervisor.name} ${item.supervisor.surname}`
@@ -93,9 +77,6 @@ const ClassListPage = async ({
           case "search":
             query.name = { contains: value, mode: "insensitive" };
             break;
-          case "gradeLevel":
-            query.gradeLevel = parseInt(value);
-            break;
           default:
             break;
         }
@@ -111,10 +92,7 @@ const ClassListPage = async ({
       },
       take: ITEM_PER_PAGE,
       skip: ITEM_PER_PAGE * (p - 1),
-      orderBy: [
-        { gradeLevel: "asc" },
-        { name: "asc" }
-      ],
+      orderBy: { name: "asc" },
     }),
     prisma.class.count({ where: query }),
   ]);

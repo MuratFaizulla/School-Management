@@ -38,8 +38,8 @@ model Teacher {
 model Class {
   id           Int    @id @default(autoincrement())  // Уникальный ID класса
   name         String @unique                        // Название класса (9А, 10Б и т.д.)
-  gradeLevel   Int                                   // Номер параллели (9, 10, 11 и т.д.)
-  capacity     Int                                   // Максимальное количество учеников
+  // gradeLevel   Int                                   // Номер параллели (9, 10, 11 и т.д.)
+  // capacity     Int                                   // Максимальное количество учеников
   supervisorId String?                               // ID классного руководителя
   supervisor   Teacher?       @relation(fields: [supervisorId], references: [id])    // Классный руководитель
   lessons      Lesson[]                              // Уроки класса
@@ -113,8 +113,8 @@ model Feedback {
   observerName    String
   observationDate DateTime
   observationTime String
-  subject         String
-  grade           String
+  // subject         String
+  // grade           String
 
   // Таблица 1
   hasTeamLeader           Boolean

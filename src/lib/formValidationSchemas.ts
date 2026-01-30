@@ -20,13 +20,7 @@ export const classSchema = z.object({
   name: z.string()
     .min(1, { message: "Название класса обязательно!" })
     .max(10, { message: "Название класса должно быть не более 10 символов!" })
-    .regex(/^\d{1,2}[A-Z]$/, { message: "Название должно быть в формате 9А, 10Б и т.д." }),
-  capacity: z.coerce.number()
-    .min(1, { message: "Вместимость класса обязательна!" })
-    .max(20, { message: "Максимальная вместимость 20 учеников!" }),
-  gradeLevel: z.coerce.number() // ✅ Исправлено с gradeId на gradeLevel
-    .min(1, { message: "Номер параллели обязателен!" })
-    .max(11, { message: "Максимальный класс - 11!" }),
+    .regex(/^\d{1,2}[А-Я]$/, { message: "Название должно быть в формате 9А, 10Б и т.д." }),
   supervisorId: z.string().optional().or(z.literal("")),
 });
 
@@ -147,12 +141,12 @@ export const feedbackSchema = z.object({
   observationTime: z.string().min(1, {
     message: "Время наблюдения обязательно!",
   }),
-  subject: z.string().min(1, {
-    message: "Предмет обязателен!",
-  }),
-  grade: z.string().min(1, {
-    message: "Параллель обязательна!",
-  }),
+  // subject: z.string().min(1, {
+  //   message: "Предмет обязателен!",
+  // }),
+  // grade: z.string().min(1, {
+  //   message: "Параллель обязательна!",
+  // }),
 
   // ТАБЛИЦА 1: Вопросы для наблюдения
   hasTeamLeader: z.boolean(),

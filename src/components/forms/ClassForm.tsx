@@ -65,28 +65,9 @@ const ClassForm = ({
         <InputField
           label="Название класса"
           name="name"
-          // placeholder="9А, 10Б и т.д."
           defaultValue={data?.name}
           register={register}
           error={errors?.name}
-        />
-        
-        <InputField
-          label="Вместимость"
-          name="capacity"
-          type="number"
-          defaultValue={data?.capacity}
-          register={register}
-          error={errors?.capacity}
-        />
-        
-        <InputField
-          label="Номер параллели"
-          name="gradeLevel"
-          type="number"
-          defaultValue={data?.gradeLevel}
-          register={register}
-          error={errors?.gradeLevel}
         />
         
         {/* Скрытое поле для ID при обновлении */}

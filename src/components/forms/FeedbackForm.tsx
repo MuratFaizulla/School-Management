@@ -63,10 +63,6 @@ const FeedbackForm = ({
         });
         (setValue as any)('observationTime', timeString);
         
-        if (selectedEvent.class) {
-          (setValue as any)('grade', selectedEvent.class.name);
-        }
-        
         toast.info(`Автозаполнение для события: ${selectedEvent.title}`);
       }
     }
@@ -89,14 +85,6 @@ const FeedbackForm = ({
           minute: '2-digit' 
         });
         (setValue as any)('observationTime', timeString);
-        
-        // ✅ Берем данные из класса события
-        if (selectedEvent.class) {
-          (setValue as any)('grade', selectedEvent.class.name);
-        }
-        
-        // ✅ Предмет пока оставляем пустым (его нужно вводить вручную)
-        // Можно было бы взять из уроков этого класса, но это усложнит логику
         
         toast.success(`Данные заполнены из события: ${selectedEvent.title}`);
       }
@@ -241,22 +229,6 @@ const FeedbackForm = ({
             defaultValue={data?.observationTime}
             register={register}
             error={errors?.observationTime}
-          />
-          
-          <InputField
-            label="Предмет"
-            name="subject"
-            defaultValue={data?.subject}
-            register={register}
-            error={errors?.subject}
-          />
-          
-          <InputField
-            label="Параллель"
-            name="grade"
-            defaultValue={data?.grade}
-            register={register}
-            error={errors?.grade}
           />
 
           {/* ✅ Для обновления - скрытые поля */}

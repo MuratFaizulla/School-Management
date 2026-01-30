@@ -4,7 +4,7 @@ const Table = ({
   data,
 }: {
   columns: { header: string; accessor: string; className?: string }[];
-  renderRow: (item: any) => React.ReactNode;
+  renderRow: (item: any, index: number) => React.ReactNode;
   data: any[];
 }) => {
   return (
@@ -16,7 +16,9 @@ const Table = ({
           ))}
         </tr>
       </thead>
-      <tbody>{data.map((item) => renderRow(item))}</tbody>
+      <tbody>
+        {data.map((item, index) => renderRow(item, index))}
+      </tbody>
     </table>
   );
 };

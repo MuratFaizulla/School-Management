@@ -10,7 +10,7 @@ const SingleEventPage = async ({
 }: {
   params: { id: string };
 }) => {
-  const { sessionClaims } = auth();
+  const { userId, sessionClaims } = auth();
   const role = (sessionClaims?.metadata as { role?: string })?.role;
 
   const event = await prisma.event.findUnique({
@@ -28,6 +28,16 @@ const SingleEventPage = async ({
   });
 
   if (!event) return notFound();
+
+  // ✅ Проверка доступа для учителей
+  if (role === "teacher" && userId) {
+    const isTeamLeader = event.teamLeaderId === userId;
+    const isParticipant = event.participants.some(p => p.teacherId === userId);
+    
+    if (!isTeamLeader && !isParticipant) {
+      return notFound(); // Учитель не имеет доступа к этому событию
+    }
+  }
 
   const translateControllerType = (type: string) => {
     const translations: { [key: string]: string } = {
@@ -195,7 +205,7 @@ const SingleEventPage = async ({
 
           {/* Информация о тим-лидере */}
           {event.teamLeader && (
-            <InfoCard title="Тим-лидер" icon="👨‍🏫">
+            <InfoCard title="Тим-лидер группы" icon="👨‍🏫">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <InfoField 
                   label="ФИО" 
@@ -258,14 +268,6 @@ const SingleEventPage = async ({
                   label="Класс" 
                   value={event.class.name}
                 />
-                <InfoField 
-                  label="Параллель" 
-                  value={`${event.class.gradeLevel} класс`}
-                />
-                <InfoField 
-                  label="Вместимость" 
-                  value={`${event.class.capacity} учеников`}
-                />
                 {event.class.supervisorId && (
                   <InfoField 
                     label="Классный руководитель" 
@@ -306,13 +308,20 @@ const SingleEventPage = async ({
                   }
                 </p>
                 {role === "admin" && (
-                  <div className="mt-3">
+                  <div className="mt-3 flex gap-2">
                     {event.feedback ? (
-                      <FormContainer 
-                        table="feedback" 
-                        type="update" 
-                        data={event.feedback}
-                      />
+                      <>
+                        <FormContainer 
+                          table="feedback" 
+                          type="update" 
+                          data={event.feedback}
+                        />
+                        <FormContainer 
+                          table="feedback" 
+                          type="delete" 
+                          id={event.feedback.id}
+                        />
+                      </>
                     ) : (
                       <FormContainer 
                         table="feedback" 
@@ -376,7 +385,10 @@ const SingleEventPage = async ({
               📋 Лист наблюдения
             </h2>
             {role === "admin" && (
-              <FormContainer table="feedback" type="update" data={event.feedback} />
+              <div className="flex items-center gap-2">
+                <FormContainer table="feedback" type="update" data={event.feedback} />
+                <FormContainer table="feedback" type="delete" id={event.feedback.id} />
+              </div>
             )}
           </div>
           
@@ -398,14 +410,6 @@ const SingleEventPage = async ({
               <InfoField 
                 label="Время наблюдения" 
                 value={event.feedback.observationTime}
-              />
-              <InfoField 
-                label="Предмет" 
-                value={event.feedback.subject}
-              />
-              <InfoField 
-                label="Параллель" 
-                value={event.feedback.grade}
               />
             </div>
           </div>

@@ -56,63 +56,52 @@ const FormContainer = async ({ table, type, data, id }: FormContainerProps) => {
         };
         break;
 
-      // ✅ Исправленный case "event"
-     case "event":
-  const eventTeachers = await prisma.teacher.findMany({
-    select: { id: true, name: true, surname: true },
-    orderBy: [{ surname: 'asc' }, { name: 'asc' }]
-  });
-  const eventClasses = await prisma.class.findMany({
-    select: { id: true, name: true, gradeLevel: true },
-    orderBy: { name: 'asc' }
-  });
-  relatedData = {
-    teachers: eventTeachers,  // ✅ Для тим-лидера и участников
-    classes: eventClasses,     // ✅ Для выбора класса
-  };
-  break;
+      case "event":
+        // ✅ Для Event нужны: учителя (тим-лидер + участники) и классы
+        const eventTeachers = await prisma.teacher.findMany({
+          select: { id: true, name: true, surname: true },
+          orderBy: [
+            { surname: 'asc' },
+            { name: 'asc' }
+          ]
+        });
+        const eventClasses = await prisma.class.findMany({
+          select: { id: true, name: true },
+          orderBy: { name: 'asc' }
+        });
+        relatedData = {
+          teachers: eventTeachers,
+          classes: eventClasses,
+        };
+        break;
 
-      // case "feedback":
-      //   const feedbackEvents = await prisma.event.findMany({
-      //     where: {
-      //       feedback: null, // Только события без обратной связи
-      //     },
-      //     select: {
-      //       id: true,
-      //       title: true,
-      //       startTime: true,
-      //       teacher: {
-      //         select: { name: true, surname: true },
-      //       },
-      //     },
-      //   });
-      //   relatedData = {
-      //     events: feedbackEvents,
-      //   };
-      //   break;
-
-case "feedback":
-  const feedbackEvents = await prisma.event.findMany({
-    where: {
-      feedback: null, // Только события без обратной связи
-    },
-    include: {
-      teamLeader: {                    // ✅ Тим-лидер
-        select: { id: true, name: true, surname: true },
-      },
-      participants: {                  // ✅ Участники через промежуточную таблицу
-        include: {
-          teacher: {
-            select: { id: true, name: true, surname: true }
-          }
-        }
-      },
-      class: {                         // ✅ Класс
-        select: { id: true, name: true }
-      }
-    },
-    orderBy: { startTime: 'desc' }
-  });
+      case "feedback":
+        // ✅ Для Feedback загружаем события с новой структурой
+        const feedbackEvents = await prisma.event.findMany({
+          where: {
+            feedback: null, // Только события без обратной связи
+          },
+          include: {
+            teamLeader: {
+              select: { id: true, name: true, surname: true },
+            },
+            participants: {
+              include: {
+                teacher: {
+                  select: { id: true, name: true, surname: true }
+                }
+              }
+            },
+            class: {
+              select: { id: true, name: true }
+            }
+          },
+          orderBy: { startTime: 'desc' }
+        });
+        relatedData = {
+          events: feedbackEvents,
+        };
+        break;
 
       default:
         break;

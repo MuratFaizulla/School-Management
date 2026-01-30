@@ -12,14 +12,16 @@ import { useRouter } from "next/navigation";
 
 // ✅ Расписание уроков
 const lessonTimes = [
- { lesson: 1, start: "08:30", end: "09:15", label: "1-й урок" },
-  { lesson: 2, start: "09:25", end: "10:10", label: "2-й урок" },
-  { lesson: 3, start: "10:20", end: "11:05", label: "3-й урок" },
-  { lesson: 4, start: "11:25", end: "12:10", label: "4-й урок" },
-  { lesson: 5, start: "12:20", end: "13:05", label: "5-й урок" },
-  { lesson: 6, start: "13:25", end: "14:10", label: "6-й урок" },
-  { lesson: 7, start: "14:20", end: "15:05", label: "7-й урок" },
-  { lesson: 8, start: "15:15", end: "16:00", label: "8-й урок" },
+ { lesson: 1, start: "08:30", end: "09:10", label: "1-й урок" },
+  { lesson: 2, start: "09:25", end: "10:05", label: "2-й урок" },
+  { lesson: 3, start: "10:20", end: "11:00", label: "3-й урок" },
+  { lesson: 4, start: "11:05", end: "11:45", label: "4-й урок" },
+  { lesson: 5, start: "12:10", end: "12:50", label: "5-й урок" },
+  { lesson: 6, start: "13:15", end: "13:55", label: "6-й урок" },
+  { lesson: 7, start: "14:00", end: "14:40", label: "7-й урок" },
+  { lesson: 8, start: "14:55", end: "15:35", label: "8-й урок" },
+    { lesson: 9, start: "15:50", end: "16:30", label: "9-й урок" },
+  { lesson: 10, start: "16:35", end: "17:15", label: "10-й урок" },
 ];
 
 const EventForm = ({
