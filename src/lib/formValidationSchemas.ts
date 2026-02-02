@@ -20,7 +20,7 @@ export const classSchema = z.object({
   name: z.string()
     .min(1, { message: "Название класса обязательно!" })
     .max(10, { message: "Название класса должно быть не более 10 символов!" })
-    .regex(/^\d{1,2}[А-Я]$/, { message: "Название должно быть в формате 9А, 10Б и т.д." }),
+    .regex(/^\d{1,2}[A-Z]?$/, { message: "Название должно быть в формате 9А, 10Б и т.д." }),
   supervisorId: z.string().optional().or(z.literal("")),
 });
 
